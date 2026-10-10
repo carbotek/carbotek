@@ -1,0 +1,767 @@
+{
+  "fr-fr": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "en-us": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-be": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "en-gb": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "nl-nl": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "nl-be": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "af": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "sq": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "am": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "ar": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "ar-dz": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ar-bh": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-eg": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-iq": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-jo": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-kw": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-lb": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-ly": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ar-ma": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ar-om": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-qa": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-sa": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-sy": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-tn": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ar-ae": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "ar-ye": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "hy": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "az-az": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "be": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "bn": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "bs": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "bg": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "my": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "zh-cn": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "zh-hk": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "zh-mo": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "zh-sg": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "zh-tw": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "hr": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "cs": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "da": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "en-au": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-bz": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-ca": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-cb": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-in": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-ie": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-jm": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-nz": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-ph": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "en-za": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "en-tt": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "et": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "mk": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "fo": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "fa": {
+    "separator": "٬",
+    "decimal": "٫",
+    "group": 3
+  },
+  "fi": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "fr-be": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "fr-ca": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "fr-lu": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "fr-ch": {
+    "separator": "’",
+    "decimal": ".",
+    "group": 3
+  },
+  "rm-ch": {
+    "separator": "’",
+    "decimal": ".",
+    "group": 3
+  },
+  "gd-ie": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "de-at": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "de-de": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "de-li": {
+    "separator": "’",
+    "decimal": ".",
+    "group": 3
+  },
+  "de-lu": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "de-ch": {
+    "separator": "’",
+    "decimal": ".",
+    "group": 3
+  },
+  "el": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "gn": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "he": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "hi": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "hu": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "is": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "id": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "it-it": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "it-ch": {
+    "separator": "’",
+    "decimal": ".",
+    "group": 3
+  },
+  "ja": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "kn": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "kk": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "km": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ko": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "lo": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "lv": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "lt": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ms-bn": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ms-my": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "ml": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "mt": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "mi": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "mr": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "mn": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ne": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "no-no": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "or": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "pl": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "pt-br": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "pt-pt": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ro-mo": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ro": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "ru": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ru-mo": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "sa": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "sr-sp": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "si": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "sk": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "sl": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "so": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-ar": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-bo": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-cl": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-co": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-cr": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-do": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-ec": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-sv": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-gt": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-hn": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-mx": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-ni": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-pa": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-py": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-pe": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-pr": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "es-es": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-uy": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es-ve": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "sw": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "sv-fi": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "sv-se": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "tg": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ta": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "te": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "th": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "bo": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ts": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "tr": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "tk": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "uk": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "ur": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "uz-uz": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "vi": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "cy": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "xh": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "yi": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "zu": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "az": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  },
+  "de": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "es": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "it": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "fr": {
+    "separator": " ",
+    "decimal": ",",
+    "group": 3
+  },
+  "nl": {
+    "separator": ".",
+    "decimal": ",",
+    "group": 3
+  },
+  "en": {
+    "separator": ",",
+    "decimal": ".",
+    "group": 3
+  }
+}

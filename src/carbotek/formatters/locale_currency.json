@@ -1,0 +1,1224 @@
+{
+  "fr-fr": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-us": {
+    "code": "USD",
+    "formats": {
+      "L": "Sv",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-be": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-gb": {
+    "code": "GBP",
+    "formats": {
+      "L": "Sv",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "nl-nl": {
+    "code": "EUR",
+    "formats": {
+      "L": "Sv",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "nl-be": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "af": {
+    "code": "ZAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sq": {
+    "code": "ALL",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "am": {
+    "code": "ETB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar": {
+    "code": "DZD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-dz": {
+    "code": "DZD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-bh": {
+    "code": "BHD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-eg": {
+    "code": "EGP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-iq": {
+    "code": "IQD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-jo": {
+    "code": "JOD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-kw": {
+    "code": "KWD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-lb": {
+    "code": "LBP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-ly": {
+    "code": "LYD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-ma": {
+    "code": "MAD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-om": {
+    "code": "OMR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-qa": {
+    "code": "QAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-sa": {
+    "code": "SAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-sy": {
+    "code": "SYP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-tn": {
+    "code": "TND",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-ae": {
+    "code": "AED",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ar-ye": {
+    "code": "YER",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "hy": {
+    "code": "AMD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "az-az": {
+    "code": "RUB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "be": {
+    "code": "BYN",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "bn": {
+    "code": "BDT",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "bs": {
+    "code": "BAM",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "bg": {
+    "code": "BGN",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "my": {
+    "code": "MMK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "zh-cn": {
+    "code": "CNY",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "zh-hk": {
+    "code": "HKD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "zh-mo": {
+    "code": "MOP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "zh-sg": {
+    "code": "SGD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "zh-tw": {
+    "code": "TWD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "hr": {
+    "code": "HRK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "cs": {
+    "code": "CZK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "da": {
+    "code": "DKK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-au": {
+    "code": "AUD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-bz": {
+    "code": "BZD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-ca": {
+    "code": "CAD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-cb": {
+    "code": "XCD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-in": {
+    "code": "INR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-ie": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-jm": {
+    "code": "JMD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-nz": {
+    "code": "NZD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-ph": {
+    "code": "PHP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-za": {
+    "code": "ZAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en-tt": {
+    "code": "TTD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "et": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "mk": {
+    "code": "MKD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fo": {
+    "code": "FOK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fa": {
+    "code": "IRR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fi": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fr-be": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fr-ca": {
+    "code": "CAD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fr-lu": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fr-ch": {
+    "code": "CHF",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "rm-ch": {
+    "code": "CHF",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "gd-ie": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "de-at": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "de-de": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "de-li": {
+    "code": "CHF",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "de-lu": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "de-ch": {
+    "code": "CHF",
+    "formats": {
+      "L": "S_v",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "el": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "gn": {
+    "code": "PYG",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "he": {
+    "code": "ILS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "hi": {
+    "code": "INR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "hu": {
+    "code": "HUF",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "is": {
+    "code": "ISK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "id": {
+    "code": "IDR",
+    "formats": {
+      "L": "Sv",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "it-it": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "it-ch": {
+    "code": "CHF",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ja": {
+    "code": "JPY",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "kn": {
+    "code": "INR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "kk": {
+    "code": "KZT",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "km": {
+    "code": "KHR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ko": {
+    "code": "KRW",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "lo": {
+    "code": "LAK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "lv": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "lt": {
+    "code": "LTL",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ms-bn": {
+    "code": "BND",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ms-my": {
+    "code": "MYR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ml": {
+    "code": "MYR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "mt": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "mi": {
+    "code": "NZD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "mr": {
+    "code": "BDT",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "mn": {
+    "code": "MNT",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ne": {
+    "code": "NPR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "no-no": {
+    "code": "NOK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "or": {
+    "code": "INR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "pl": {
+    "code": "PLN",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "pt-br": {
+    "code": "BRL",
+    "formats": {
+      "L": "S_v",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "pt-pt": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ro-mo": {
+    "code": "MDL",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ro": {
+    "code": "RON",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ru": {
+    "code": "RUB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ru-mo": {
+    "code": "MDL",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sa": {
+    "code": "MVR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sr-sp": {
+    "code": "RUB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "si": {
+    "code": "LKR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sk": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sl": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "so": {
+    "code": "SOS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-ar": {
+    "code": "ARS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-bo": {
+    "code": "BOB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-cl": {
+    "code": "CLP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-co": {
+    "code": "COP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-cr": {
+    "code": "CRC",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-do": {
+    "code": "DOP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-ec": {
+    "code": "ECS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-sv": {
+    "code": "SVC",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-gt": {
+    "code": "GTQ",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-hn": {
+    "code": "HNL",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-mx": {
+    "code": "MXN",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-ni": {
+    "code": "NIO",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-pa": {
+    "code": "PAB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-py": {
+    "code": "PYG",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-pe": {
+    "code": "PEN",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-pr": {
+    "code": "USD",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-es": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-uy": {
+    "code": "UYU",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es-ve": {
+    "code": "VES",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sw": {
+    "code": "TZS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sv-fi": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "sv-se": {
+    "code": "SEK",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "tg": {
+    "code": "TJS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ta": {
+    "code": "LKR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "te": {
+    "code": "INR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "th": {
+    "code": "THB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "bo": {
+    "code": "CNY",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ts": {
+    "code": "ZAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "tr": {
+    "code": "TRY",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "tk": {
+    "code": "TMT",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "uk": {
+    "code": "UAH",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "ur": {
+    "code": "PKR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "uz-uz": {
+    "code": "UZS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "vi": {
+    "code": "VND",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "cy": {
+    "code": "GBP",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "xh": {
+    "code": "ZAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "yi": {
+    "code": "ILS",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "zu": {
+    "code": "ZAR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "az": {
+    "code": "RUB",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "de": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "es": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "it": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "fr": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "nl": {
+    "code": "EUR",
+    "formats": {
+      "L": "Sv",
+      "LL": "v_M",
+      "M": "M"
+    }
+  },
+  "en": {
+    "code": "EUR",
+    "formats": {
+      "L": "v_S"
+    }
+  }
+}

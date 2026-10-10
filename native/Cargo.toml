@@ -1,0 +1,21 @@
+[package]
+name = "carbotek-native"
+version = "0.1.0"
+edition = "2024"
+# edition 2024 needs 1.85, unsigned is_multiple_of 1.87.
+rust-version = "1.87"
+description = "Optional native accelerators of carbotek (carbotek._native)"
+license = "PolyForm-Noncommercial-1.0.0"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+# No extension-module feature: maturin sets PYO3_BUILD_EXTENSION_MODULE for wheels, and cargo test
+# can still link against libpython.
+pyo3 = "0.29"
+base64 = "0.23"
+# Shortest round-trip digits with ties to even, as JS and Python repr print them.
+ryu = "1"

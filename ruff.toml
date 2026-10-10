@@ -1,0 +1,61 @@
+# Linter and formatter settings.
+#
+# Local exceptions go next to the code, with the rule code and a reason:
+#     value = eval(source)  # noqa: S307  source is a constant table
+# PGH004 rejects a bare noqa and RUF100 reports noqa comments that are no longer needed.
+
+line-length = 120
+
+# target-version is taken from project.requires-python in pyproject.toml.
+
+[lint]
+select = [
+    "E", "W", "F",          # pycodestyle, pyflakes
+    "I",                    # import order
+    "UP",                   # modern syntax for the target version
+    "B", "SIM", "RET", "C4", "PIE", "PERF", "FURB",
+    "C901",                 # function complexity, see [lint.mccabe]
+    "PTH",                  # pathlib instead of os.path
+    "S",                    # security (bandit)
+    "DTZ",                  # naive datetimes
+    "LOG", "G",             # logging
+    "T20",                  # leftover print
+    "ASYNC",
+    "BLE",                  # blind except
+    "INT", "YTT",
+    "RUF",                  # includes RUF100, unused noqa
+    "PGH",                  # includes PGH004, noqa without codes
+]
+
+ignore = [
+    # Conflict with ruff format, which owns line length and indentation.
+    "E501", "W191", "E101",
+    # Cyrillic letters in strings and comments are intentional (Russian formatters and locales).
+    "RUF001", "RUF002", "RUF003",
+    "E402",
+]
+
+[lint.mccabe]
+max-complexity = 15
+
+[lint.per-file-ignores]
+"**/tests/**" = [
+    "S101",             # assert is the test
+    "SLF001",           # white-box access to private attributes
+    "PLR2004",          # magic values in expectations
+    "ARG",              # unused fixture arguments
+    "PLC0415",          # imports inside fixtures
+    "PT018",            # composite asserts
+    "INP001",           # test packages need no __init__.py
+    "S105", "S106",     # synthetic secrets in fixtures
+    "DTZ001",           # naive datetimes in expectations
+    "PYI034",
+    "FBT001", "FBT002", # bool parameters in parametrize
+    "ERA001",
+    "T20",
+    "BLE001",
+]
+
+[format]
+# Code samples in Markdown are documentation, not code under the formatter.
+exclude = ["*.md"]

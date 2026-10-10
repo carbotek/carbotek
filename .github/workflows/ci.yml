@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      - run: uv run tach check
+      - run: uv run tach check-external
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      # rustup installs the toolchain pinned in rust-toolchain.toml on first use.
+      - run: uv sync --locked
+      - run: uv run pytest -n auto -q
+      - name: Python backend
+        run: uv run pytest -n auto -q
+        env:
+          CARBOTEK_NATIVE: "0"
+      - name: cargo test
+        working-directory: native
+        run: PYO3_PYTHON="$(cd .. && uv run python -c 'import sys; print(sys.executable)')" cargo test
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          manylinux: auto
+          args: --release --out dist -i python3.15
+      - uses: actions/upload-artifact@v5
+        with:
+          name: wheel
+          path: dist
+
+  # The released wheel, installed in the production image without a compiler or Rust.
+  target-image:
+    needs: wheel
+    runs-on: ubuntu-latest
+    # The production image. Switch to python:3.15-slim-trixie once Docker Hub publishes it.
+    container: python:3.15-rc-slim-trixie
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v6
+        with:
+          name: wheel
+          path: dist
+      - run: |
+          pip install --root-user-action=ignore --only-binary=:all: dist/*.whl pytest pytest-xdist
+      - run: CARBOTEK_NATIVE=1 python -c "import carbotek; from carbotek._native_adapter import native_available; assert native_available(); assert 'site-packages' in carbotek.__file__"
+      - name: Tests against the installed wheel
+        run: |
+          mkdir /tmp/run && cp -r tests tools native pyproject.toml /tmp/run/
+          cd /tmp/run
+          python -m pytest -n auto -q -p no:cacheprovider tests
+          CARBOTEK_NATIVE=0 python -m pytest -n auto -q -p no:cacheprovider tests
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.15"
+      - name: Build and test the installed source distribution and the pure wheel
+        run: |
+          uv build --sdist --out-dir "$RUNNER_TEMP/sdist"
+          uv venv "$RUNNER_TEMP/sdist-check"
+          python="$RUNNER_TEMP/sdist-check/bin/python"
+          uv pip install --python "$python" "$RUNNER_TEMP"/sdist/*.tar.gz pytest pytest-xdist
+          CARBOTEK_NATIVE=1 "$python" -c "import carbotek; from carbotek._native_adapter import native_available; assert native_available(); assert 'site-packages' in carbotek.__file__"
+          "$python" -m pytest -n auto -q tests -p no:cacheprovider
+          mkdir "$RUNNER_TEMP/unpacked"
+          tar -xzf "$RUNNER_TEMP"/sdist/*.tar.gz -C "$RUNNER_TEMP/unpacked" --strip-components=1
+          cd "$RUNNER_TEMP/unpacked"
+          uv run --no-project --with build --with setuptools --with wheel python tools/build_pure_wheel.py --out "$RUNNER_TEMP/pure"
+          uv venv "$RUNNER_TEMP/pure-check"
+          uv pip install --python "$RUNNER_TEMP/pure-check/bin/python" "$RUNNER_TEMP"/pure/*.whl pytest pytest-xdist
+          "$RUNNER_TEMP/pure-check/bin/python" -c "import carbotek; from carbotek._native_adapter import native_available; assert not native_available(); assert 'site-packages' in carbotek.__file__"
+          cd "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/pure-check/bin/python" -m pytest -n auto -q tests -p no:cacheprovider

@@ -1,0 +1,143 @@
+# Architecture boundaries checked by tach (https://docs.gauge.sh).
+#
+# Layers, top to bottom. Importing a higher layer is always an error; importing a lower one is
+# allowed only for the modules listed in depends_on (layers_explicit_depends_on).
+#
+#   interface      cli: argument parsing and file I/O
+#   api            Engine and the module-level render functions
+#   orchestration  render pipeline, compiled-template cache, PDF conversion
+#   extensions     DOCX features (images, HTML, hyperlinks, colors, charts) and XLSX support
+#   engine         DOCX tree rendering: loops, conditions, text substitution
+#   language       marker syntax and formatters
+#   foundation     OOXML package model, safe XML, render options
+#
+# errors, util, typing_helpers and _native_adapter are leaf utilities that every layer may use.
+layers = ["interface", "api", "orchestration", "extensions", "engine", "language", "foundation"]
+layers_explicit_depends_on = true
+
+# carbotek/__init__.py (the public re-exports) and __main__.py assemble the package.
+root_module = "ignore"
+
+source_roots = ["src"]
+exclude = ["tests", "native", "scripts", ".venv", "**/__pycache__"]
+forbid_circular_dependencies = true
+exact = true
+
+[[modules]]
+path = "carbotek.cli"
+layer = "interface"
+depends_on = [
+  "carbotek.api",
+  "carbotek.markers",
+  "carbotek.ooxml",
+]
+
+[[modules]]
+path = "carbotek.api"
+layer = "api"
+depends_on = [
+  "carbotek.pipeline",
+  "carbotek.opc",
+  "carbotek.pdf",
+  "carbotek.features",
+  "carbotek.docx",
+  "carbotek.options",
+]
+
+[[modules]]
+path = "carbotek.pipeline"
+layer = "orchestration"
+depends_on = [
+  "carbotek.xlsx",
+  "carbotek.markers",
+  "carbotek.features",
+  "carbotek.docx",
+  "carbotek.ooxml",
+  "carbotek.package",
+  "carbotek.options",
+]
+
+[[modules]]
+path = "carbotek.opc"
+layer = "orchestration"
+depends_on = ["carbotek.ooxml", "carbotek.package"]
+
+[[modules]]
+path = "carbotek.pdf"
+layer = "orchestration"
+depends_on = []
+
+[[modules]]
+path = "carbotek.xlsx"
+layer = "extensions"
+depends_on = ["carbotek.features", "carbotek.docx", "carbotek.ooxml", "carbotek.package"]
+
+[[modules]]
+path = "carbotek.features"
+layer = "extensions"
+depends_on = [
+  "carbotek.docx",
+  "carbotek.markers",
+  "carbotek.formatters",
+  "carbotek.ooxml",
+  "carbotek.package",
+  "carbotek.options",
+]
+
+[[modules]]
+path = "carbotek.docx"
+layer = "engine"
+depends_on = ["carbotek.markers", "carbotek.formatters", "carbotek.ooxml", "carbotek.options"]
+
+[[modules]]
+path = "carbotek.markers"
+layer = "language"
+depends_on = []
+
+[[modules]]
+path = "carbotek.formatters"
+layer = "language"
+depends_on = []
+
+[[modules]]
+path = "carbotek.package"
+layer = "foundation"
+depends_on = ["carbotek.ooxml"]
+
+[[modules]]
+path = "carbotek.ooxml"
+layer = "foundation"
+depends_on = []
+
+[[modules]]
+path = "carbotek.options"
+layer = "foundation"
+depends_on = []
+
+[[modules]]
+path = "carbotek.errors"
+utility = true
+
+[[modules]]
+path = "carbotek.util"
+utility = true
+
+[[modules]]
+path = "carbotek.typing_helpers"
+utility = true
+
+[[modules]]
+path = "carbotek._native_adapter"
+utility = true
+
+[[modules]]
+path = "carbotek.render_state"
+utility = true
+
+[[modules]]
+path = "carbotek.cache"
+utility = true
+
+[external]
+# dxpdf is imported dynamically by carbotek.pdf; tzdata only provides zoneinfo data.
+exclude = ["dxpdf", "tzdata"]

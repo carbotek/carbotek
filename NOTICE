@@ -1,0 +1,13 @@
+carbotek
+Copyright (c) 2026 Carbotek
+
+Licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE).
+Commercial use requires a separate license from the copyright holder.
+
+This product is derived from Carbone v3.2.3
+(https://github.com/carboneio/carbone),
+Copyright (c) CarboneIO SAS and contributors,
+licensed under the Apache License, Version 2.0 (see licenses/Carbone-Apache-2.0.txt).
+The original JavaScript code was translated to Python and Rust and substantially modified.
+
+carbotek is not affiliated with or endorsed by CarboneIO SAS.

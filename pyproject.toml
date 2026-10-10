@@ -1,0 +1,70 @@
+[project]
+name = "carbotek"
+dynamic = ["version"]
+description = "Render DOCX/XLSX templates with Carbone-style markers to DOCX, XLSX or PDF, without LibreOffice"
+readme = "README.md"
+requires-python = ">=3.15"
+license = "PolyForm-Noncommercial-1.0.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md", "licenses/*"]
+keywords = ["docx", "xlsx", "pdf", "template", "report", "carbone", "document-generation"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.15",
+  "Programming Language :: Rust",
+  "Topic :: Office/Business :: Office Suites",
+  "Topic :: Text Processing :: Markup :: XML",
+  "Typing :: Typed",
+]
+dependencies = [
+  "dxpdf>=0.8,<1",
+  "lxml>=5.3,<7",
+  "pillow>=11,<13",
+  "python-barcode>=0.16,<1",
+  "resvg-py>=0.5,<0.6",
+  "segno>=1.6,<2",
+  "tzdata>=2025.2",
+]
+authors = [{ name = "Carbotek", email = "337455888+carbotek@users.noreply.github.com" }]
+
+[project.urls]
+Homepage = "https://github.com/carbotek/carbotek"
+Issues = "https://github.com/carbotek/carbotek/issues"
+
+[project.scripts]
+carbotek = "carbotek.cli:main"
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.414",
+    "pytest==9.1.1",
+    "pytest-xdist==3.8.0",
+    "ruff==0.16.9",
+    "tach==0.35.2",
+    "types-lxml==2026.2.16",
+]
+
+[tool.pyright]
+include = ["src"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.15"
+
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+manifest-path = "native/Cargo.toml"
+module-name = "carbotek._native"
+# One abi3 wheel for CPython 3.15 and later.
+features = ["pyo3/abi3-py315"]
+python-source = "src"
+exclude = ["**/__pycache__/**", "**/*.pyc"]
+include = [{ path = "README.ru.md", format = "sdist" }, { path = "NOTICE", format = "sdist" }, { path = "tools/*.py", format = "sdist" }]
+
+[tool.uv.extra-build-variables]
+# tach depends on PyYAML, which has no CPython 3.15 wheels yet: build its pure-Python variant.
+pyyaml = { PYYAML_FORCE_LIBYAML = "0" }
