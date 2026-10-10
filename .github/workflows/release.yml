@@ -120,4 +120,4 @@ jobs:
         run: |
           flags=()
           if [[ "$PRERELEASE" == true ]]; then flags+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}"
+          gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes "${flags[@]}"
