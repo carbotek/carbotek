@@ -90,8 +90,8 @@ jobs:
         with:
           name: wheel
           path: dist
-      # The bundled fontconfig needs libexpat, which the slim image does not ship; PDF also needs fonts.
-      - run: apt-get update && apt-get install -y --no-install-recommends libexpat1 fonts-dejavu-core
+      # PDF needs fontconfig's configuration and libexpat (not in the slim image) and some fonts.
+      - run: apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core
       - run: |
           pip install --root-user-action=ignore --only-binary=:all: dist/*.whl pytest pytest-xdist pypdfium2==5.14.0
       - run: CARBOTEK_NATIVE=1 python -c "import carbotek; from carbotek._native_adapter import native_available, native_pdf_available; assert native_available() and native_pdf_available(); assert 'site-packages' in carbotek.__file__"

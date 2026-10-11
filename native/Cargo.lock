@@ -202,6 +202,7 @@ dependencies = [
  "base64",
  "dxpdf",
  "pyo3",
+ "quick-xml",
  "ryu",
 ]
 

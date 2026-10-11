@@ -22,9 +22,11 @@ ryu = "1"
 # Patched copy of dxpdf 0.8.1 (DOCX to PDF), see vendor/dxpdf/CARBOTEK.md. The python feature of
 # dxpdf is not used: carbotek exposes its own convert_pdf.
 dxpdf = { path = "vendor/dxpdf", default-features = false, features = ["subset-fonts"], optional = true }
+# Also a direct dependency so that the source distribution carries it ([patch] paths are not packed).
+quick-xml = { path = "vendor/quick-xml-0.41.0", optional = true }
 
 [features]
-pdf = ["dep:dxpdf"]
+pdf = ["dep:dxpdf", "dep:quick-xml"]
 
 # dxpdf builds with a patched quick-xml (vendor/quick-xml-0.41.0/PATCH.md); a [patch] in a
 # dependency's manifest is ignored, so it is repeated here.

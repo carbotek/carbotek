@@ -213,7 +213,7 @@ the optional image downloads.
   - For a task queue (for example taskiq or Celery), a synchronous task with process-based workers scales best, because rendering holds the GIL.
 - **Map `CarbotekError` to client errors (4xx)** by its `code`. Any other exception is a server error.
 - **Install the template fonts in the container** (or metric-compatible fonts such as Carlito/Caladea). PDF uses system fonts.
-  On `python:3.15-slim` images also install `libexpat1` (needed by the bundled fontconfig): `apt-get install -y libexpat1`.
+  On `python:3.15-slim` images also install fontconfig (its configuration and libexpat are not in the image): `apt-get install -y fontconfig`.
 
 ```python
 import asyncio
