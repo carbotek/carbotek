@@ -47,7 +47,7 @@ pub struct CellLine {
 pub struct StackResult {
     /// Draw commands positioned relative to the stacking origin (0,0).
     pub commands: Vec<DrawCommand>,
-    /// Required height: text flow plus any non-wrapping drawing overflow.
+    /// Height consumed by text and wrapping objects; wrapNone may paint outside it.
     pub height: Pt,
     /// Per-line cut model for §17.4.1 row splitting (cell-content coords).
     /// Empty when the content cannot be safely bisected (nested table or
@@ -85,9 +85,6 @@ pub fn stack_blocks(
     let constraints = super::super::BoxConstraints::tight_width(content_width, Pt::INFINITY);
     let mut commands = Vec::new();
     let mut cursor_y = Pt::ZERO;
-    // Non-wrapping drawings enlarge the containing cell's painted bounds,
-    // but must not advance the cursor used by subsequent paragraphs.
-    let mut overlay_bottom = Pt::ZERO;
     let mut prev_space_after = Pt::ZERO;
     let mut prev_style_id: Option<crate::model::StyleId> = None;
     let mut page_floats: Vec<float::ActiveFloat> = Vec::new();
@@ -315,9 +312,9 @@ pub fn stack_blocks(
                         src_rect: fi.src_rect,
                     });
                     let img_bottom = img_y + fi.size.height;
-                    if matches!(fi.wrap_mode, super::types::WrapMode::None) {
-                        overlay_bottom = overlay_bottom.max(img_bottom);
-                    } else if img_bottom > cursor_y {
+                    if !matches!(fi.wrap_mode, super::types::WrapMode::None)
+                        && img_bottom > cursor_y
+                    {
                         cursor_y = img_bottom;
                     }
                 }
@@ -418,7 +415,7 @@ pub fn stack_blocks(
 
     StackResult {
         commands,
-        height: cursor_y.max(overlay_bottom),
+        height: cursor_y,
         lines: if splittable { cell_lines } else { Vec::new() },
     }
 }
@@ -780,17 +777,12 @@ mod tests {
         );
     }
 
-    /// A non-wrapping image is still drawn and expands the cell's required
-    /// height, independently of the cursor used for following paragraphs.
+    /// A non-wrapping image is drawn without enlarging the cell's flow height.
     #[test]
     fn wrap_none_image_is_still_emitted() {
         let result = stack(&[wide_para(vec![sized_image(200.0, WrapMode::None)])]);
         assert_eq!(image_ys(&result), vec![0.0], "the image is painted");
-        assert!(
-            (result.height.raw() - 60.0).abs() < 1e-4,
-            "height still reaches the image bottom, got {}",
-            result.height.raw()
-        );
+        assert_eq!(result.height, stack(&[wide_para(vec![])]).height);
     }
 
     /// A non-wrapping drawing contributes to the cell's painted bounds, not
@@ -811,7 +803,7 @@ mod tests {
             ]);
             assert_eq!(text_ys(&overlaid), text_ys(&baseline));
             assert_eq!(image_ys(&overlaid), vec![0.0]);
-            assert_eq!(overlaid.height.raw(), 60.0);
+            assert_eq!(overlaid.height, baseline.height);
         }
     }
 
@@ -839,7 +831,7 @@ mod tests {
         ]);
         assert_eq!(text_ys(&overlaid), text_ys(&baseline));
         assert_eq!(image_ys(&overlaid), vec![2.0, LINE + 3.0]);
-        assert_eq!(overlaid.height.raw(), LINE + 103.0);
+        assert_eq!(overlaid.height, baseline.height);
     }
 
     /// The wrap-enabled modes are unaffected — they still narrow the text.

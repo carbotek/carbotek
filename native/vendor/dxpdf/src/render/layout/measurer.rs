@@ -115,11 +115,14 @@ impl<'r> TextMeasurer<'r> {
         let fc = cache.entry(slot).or_insert_with(|| {
             let (_, m) = font.metrics();
             FontMeasureCache {
-                metrics: TextMetrics {
-                    ascent: Pt::new(-m.ascent),
-                    descent: Pt::new(m.descent),
-                    leading: Pt::new(m.leading.max(0.0)),
-                },
+                metrics: word_line_metrics(
+                    font,
+                    TextMetrics {
+                        ascent: Pt::new(-m.ascent),
+                        descent: Pt::new(m.descent),
+                        leading: Pt::new(m.leading.max(0.0)),
+                    },
+                ),
                 widths: FxHashMap::default(),
             }
         });
@@ -325,11 +328,81 @@ impl<'r> TextMeasurer<'r> {
     }
 }
 
+/// Calibri's typographic leading accounts for the difference between its
+/// typographic and Windows line boxes. Word uses the latter baseline. If both
+/// boxes have the same total height, redistribute that space without changing
+/// line spacing; otherwise retain Skia's metrics (including non-OpenType faces).
+fn word_line_metrics(font: &Font, metrics: TextMetrics) -> TextMetrics {
+    let face = font.typeface();
+    let Some(table) = face.copy_table_data(u32::from_be_bytes(*b"OS/2")) else {
+        return metrics;
+    };
+    let Some(units) = face.units_per_em().filter(|units| *units > 0) else {
+        return metrics;
+    };
+    windows_line_metrics(table.as_bytes(), units as f32, font.size(), metrics)
+}
+
+fn windows_line_metrics(table: &[u8], units: f32, size: f32, metrics: TextMetrics) -> TextMetrics {
+    // OS/2 version 0 already contains usWinAscent/usWinDescent at 74/76.
+    if table.len() < 78 || units <= 0.0 {
+        return metrics;
+    }
+    let ascent = u16::from_be_bytes([table[74], table[75]]) as f32 * size / units;
+    let descent = u16::from_be_bytes([table[76], table[77]]) as f32 * size / units;
+    let natural = metrics.ascent + metrics.descent + metrics.leading;
+    if ascent > 0.0 && (ascent + descent - natural.raw()).abs() < 0.02 {
+        TextMetrics {
+            ascent: Pt::new(ascent),
+            descent: Pt::new(descent),
+            leading: Pt::ZERO,
+        }
+    } else {
+        metrics
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::render::fonts::Toggle;
     use std::rc::Rc;
+
+    #[test]
+    fn calibri_windows_baseline_preserves_natural_line_height() {
+        let mut os2 = [0u8; 78];
+        os2[74..76].copy_from_slice(&1950u16.to_be_bytes());
+        os2[76..78].copy_from_slice(&550u16.to_be_bytes());
+        let metrics = TextMetrics {
+            ascent: Pt::new(1536.0 * 11.0 / 2048.0),
+            descent: Pt::new(512.0 * 11.0 / 2048.0),
+            leading: Pt::new(452.0 * 11.0 / 2048.0),
+        };
+        let word = windows_line_metrics(&os2, 2048.0, 11.0, metrics);
+        assert!((word.ascent.raw() - 10.473633).abs() < 0.001);
+        assert!(
+            (word.ascent + word.descent + word.leading
+                - metrics.ascent
+                - metrics.descent
+                - metrics.leading)
+                .raw()
+                .abs()
+                < 0.001
+        );
+        // Missing or unrelated line boxes retain the existing font behavior.
+        assert_eq!(
+            windows_line_metrics(&os2[..74], 2048.0, 11.0, metrics).ascent,
+            metrics.ascent
+        );
+        assert_eq!(
+            windows_line_metrics(&os2, 1024.0, 11.0, metrics).ascent,
+            metrics.ascent
+        );
+        assert_eq!(
+            windows_line_metrics(&os2, 0.0, 11.0, metrics).ascent,
+            metrics.ascent
+        );
+    }
 
     fn fp_at_scale(scale: f32) -> FontProps {
         FontProps {

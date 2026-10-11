@@ -66,12 +66,54 @@ pub(crate) fn measure_leading_table_group_height(
         suppress_first_row_top,
     );
 
-    Some(
-        measured.rows[..group_end]
-            .iter()
-            .map(|row| row.height + row.border_gap_below)
-            .sum(),
-    )
+    let flow_height = measured.rows[..group_end]
+        .iter()
+        .map(|row| row.height + row.border_gap_below)
+        .sum();
+    Some(painted_group_height(
+        &measured,
+        rows,
+        0..group_end,
+        flow_height,
+    ))
+}
+
+/// Non-wrapping drawings can overflow a row without growing it (Word's
+/// wrapNone behavior). Use their actual emitted positions for page-fit only,
+/// preserving border shifts, cell margins, vAlign and vertical merges.
+fn painted_group_height(
+    measured: &MeasuredTable,
+    rows: &[TableRowInput],
+    range: std::ops::Range<usize>,
+    flow_height: Pt,
+) -> Pt {
+    let has_drawings = measured.rows[range.clone()].iter().any(|row| {
+        row.entries.iter().any(|entry| {
+            entry.layout.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    DrawCommand::Image { .. } | DrawCommand::Path { .. }
+                )
+            })
+        })
+    });
+    if !has_drawings {
+        return flow_height;
+    }
+    let mut builder = SliceBuilder::new();
+    let (cursor, mut buffers) = builder.emit_into();
+    emit_table_rows(measured, rows, range, cursor, &mut buffers, None);
+    builder
+        .content_commands
+        .iter()
+        .fold(flow_height, |height, command| {
+            let bottom = match command {
+                DrawCommand::Image { rect, .. } => rect.origin.y + rect.size.height,
+                DrawCommand::Path { origin, extent, .. } => origin.y + extent.height,
+                _ => Pt::ZERO,
+            };
+            height.max(bottom)
+        })
 }
 
 /// The buffers one slice is emitted into, and the tail that closes it.
@@ -349,7 +391,7 @@ pub(crate) fn layout_table_paginated_with_page_heights(
     let mut remaining = available_height;
 
     for group in &groups {
-        if group.height <= remaining {
+        if group.required_height <= remaining {
             current_slice.push(SliceItem::Range(group.start..group.end));
             remaining -= group.height;
             continue;
@@ -475,12 +517,12 @@ pub(crate) fn layout_table_paginated_with_page_heights(
                 remaining -= header_height;
             }
         }
-        if group.height > remaining {
+        if group.required_height > remaining {
             log::warn!(
                 "[table] row group {}-{} ({:.1}pt) exceeds page height ({:.1}pt available)",
                 group.start,
                 group.end,
-                group.height.raw(),
+                group.required_height.raw(),
                 remaining.raw(),
             );
         }
@@ -584,6 +626,89 @@ mod tests {
     use crate::render::layout::section::LayoutBlock;
     use crate::render::resolve::color::RgbColor;
     use std::rc::Rc;
+
+    #[test]
+    fn wrap_none_overflow_is_used_for_fit_but_not_row_flow_height() {
+        use crate::render::layout::section::{
+            FloatingImage, FloatingImageX, FloatingImageY, WrapMode,
+        };
+        use crate::render::resolve::images::MediaEntry;
+        let mut cell = simple_cell("anchor");
+        if let LayoutBlock::Paragraph {
+            floating_images, ..
+        } = &mut cell.blocks[0]
+        {
+            floating_images.push(FloatingImage {
+                image_data: MediaEntry {
+                    data: std::sync::Arc::from(&b""[..]),
+                    format: crate::model::ImageFormat::Png,
+                },
+                size: PtSize::new(Pt::new(30.0), Pt::new(100.0)),
+                src_rect: None,
+                x: FloatingImageX::Absolute(Pt::ZERO),
+                y: FloatingImageY::RelativeToParagraph(Pt::ZERO),
+                wrap_mode: WrapMode::None,
+                dist_left: Pt::ZERO,
+                dist_right: Pt::ZERO,
+                behind_doc: false,
+            });
+        }
+        // The other cell supplies legal line cuts. They must not allow the
+        // row splitter to strand the first cell's drawing on a short page.
+        let mut other = simple_cell("other");
+        other.blocks = (0..5)
+            .map(|_| simple_cell("other").blocks.remove(0))
+            .collect();
+        let rows = vec![TableRowInput {
+            cells: vec![cell, other],
+            height_rule: None,
+            is_header: None,
+            cant_split: None,
+            grid_before: 0,
+            border_overrides: None,
+            bidi_override: None,
+        }];
+        let widths = [Pt::new(200.0), Pt::new(200.0)];
+        let table = layout_table(&rows, &widths, Pt::ZERO, Pt::new(14.0), None, None, false);
+        assert!(
+            table.size.height < Pt::new(100.0),
+            "drawing must not grow the row"
+        );
+        let required = measure_leading_table_group_height(
+            &rows,
+            &widths,
+            Pt::ZERO,
+            Pt::new(14.0),
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+        assert!(
+            required >= Pt::new(100.0),
+            "drawing must still fit on the page"
+        );
+        let slices = layout_table_paginated(
+            &rows,
+            &widths,
+            Pt::ZERO,
+            Pt::new(14.0),
+            None,
+            None,
+            &TablePaginationConfig {
+                available_height: Pt::new(50.0),
+                page_height: Pt::new(200.0),
+                suppress_first_row_top: false,
+            },
+        );
+        assert_eq!(slices.len(), 2);
+        assert!(slices[0].commands.is_empty());
+        assert_eq!(slices[1].size.height, table.size.height);
+        assert!(slices[1]
+            .commands
+            .iter()
+            .any(|c| matches!(c, DrawCommand::Image { .. })));
+    }
 
     fn text_frag(text: &str, width: f32) -> Fragment {
         Fragment::Text {

@@ -9,6 +9,8 @@ pub(super) struct RowGroup {
     pub(super) start: usize,
     pub(super) end: usize, // exclusive
     pub(super) height: Pt,
+    /// Space needed to paint the group without clipping, independent of flow.
+    pub(super) required_height: Pt,
     /// §17.4.6: row content may be broken across pages. False if any row in
     /// the group has `cantSplit`, if the group is a vMerge span (multiple
     /// rows stacked here), or if any cell contains a nested table or floated
@@ -64,6 +66,7 @@ pub(super) fn build_row_groups(rows: &[TableRowInput], measured: &MeasuredTable)
             .iter()
             .map(|mr| mr.height + mr.border_gap_below)
             .sum();
+        let required_height = super::painted_group_height(measured, rows, start..i, height);
 
         // §17.4.6: a row may be split across pages unless it opts out via
         // `cantSplit` or lives inside a vMerge span (grouping multiple rows).
@@ -71,16 +74,17 @@ pub(super) fn build_row_groups(rows: &[TableRowInput], measured: &MeasuredTable)
         // commands would be hard to bisect cleanly.
         let is_vmerge_span = i - start > 1;
         let any_cant_split = rows[start..i].iter().any(|r| r.cant_split == Some(true));
-        let has_nested_table = rows[start..i]
+        let has_atomic_content = rows[start..i]
             .iter()
             .flat_map(|r| r.cells.iter())
-            .any(cell_has_nested_table);
-        let splittable = !is_vmerge_span && !any_cant_split && !has_nested_table;
+            .any(cell_has_atomic_content);
+        let splittable = !is_vmerge_span && !any_cant_split && !has_atomic_content;
 
         groups.push(RowGroup {
             start,
             end: i,
             height,
+            required_height,
             splittable,
         });
     }
@@ -105,11 +109,16 @@ pub(super) fn row_group_end(rows: &[TableRowInput], start: usize) -> usize {
     end
 }
 
-fn cell_has_nested_table(cell: &TableCellInput) -> bool {
+fn cell_has_atomic_content(cell: &TableCellInput) -> bool {
     use crate::render::layout::section::LayoutBlock;
-    cell.blocks
-        .iter()
-        .any(|b| matches!(b, LayoutBlock::Table { .. }))
+    cell.blocks.iter().any(|b| match b {
+        LayoutBlock::Table { .. } => true,
+        LayoutBlock::Paragraph {
+            floating_images,
+            floating_shapes,
+            ..
+        } => !floating_images.is_empty() || !floating_shapes.is_empty(),
+    })
 }
 
 /// §17.4.84: grow the rows of each vertical merge group so the `Restart`

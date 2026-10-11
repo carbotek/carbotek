@@ -292,7 +292,10 @@ pub(super) fn build_paragraph_block(
     // paragraph. Table cells emit their commands through `stack_blocks`,
     // which shifts them into page coordinates, so anchors inside a cell use
     // the stack frame. Body paragraphs emit in page-absolute coordinates.
-    let frame = if table_style.is_some() {
+    // An unstyled table is still a cell: conditional formatting carries
+    // its cell context even when no table style resolves. Using style presence
+    // here applied the page's left margin twice to unstyled cell drawings.
+    let frame = if cond.is_some() {
         AnchorFrame::Stack
     } else {
         AnchorFrame::Page

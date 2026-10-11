@@ -45,7 +45,7 @@ def _png(draw_circle: bool) -> bytes:
 def _anchor(index: int, relationship: str, layer: int) -> str:
     return (
         f'<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" '
-        f'relativeHeight="{layer}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">'
+        f'relativeHeight="{251657216 + layer * 1024}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">'
         '<wp:simplePos x="0" y="0"/>'
         '<wp:positionH relativeFrom="column"><wp:posOffset>720000</wp:posOffset></wp:positionH>'
         '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
@@ -64,14 +64,20 @@ def _paragraph(text: str, runs: str = "") -> str:
     return f"<w:p>{runs}<w:r><w:t>{text}</w:t></w:r></w:p>"
 
 
-def _docx(*, pictures: bool, padding: int = 0, cell: bool = False) -> bytes:
+def _docx(
+    *, pictures: bool, padding: int = 0, cell: bool = False, styled: bool = False, mixed_cell: bool = False
+) -> bytes:
     """Anchor paragraph with the pictures, then two text paragraphs; in the body or in a table cell."""
     anchors = _anchor(1, "rIdSquare", 1) + _anchor(2, "rIdCircle", 2) if pictures else ""
     content = _paragraph("ANCHOR", anchors) + _paragraph("LINE AFTER") + _paragraph("NEXT")
     if cell:
+        grid = '<w:gridCol w:w="4677"/><w:gridCol w:w="4678"/>' if mixed_cell else '<w:gridCol w:w="9355"/>'
+        other = ("<w:tc>" + "".join(_paragraph(f"OTHER {i}") for i in range(4)) + "</w:tc>") if mixed_cell else ""
         content = (
-            '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tblGrid><w:gridCol w:w="9355"/></w:tblGrid>'
-            f'<w:tr><w:tc><w:tcPr><w:tcW w:w="9355" w:type="dxa"/></w:tcPr>{content}</w:tc></w:tr></w:tbl>'
+            "<w:tbl><w:tblPr>"
+            + ('<w:tblStyle w:val="ProbeTable"/>' if styled else "")
+            + f'<w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tblGrid>{grid}</w:tblGrid>'
+            f'<w:tr><w:tc><w:tcPr><w:tcW w:w="{4677 if mixed_cell else 9355}" w:type="dxa"/></w:tcPr>{content}</w:tc>{other}</w:tr></w:tbl>'
             + _paragraph("AFTER TABLE")
         )
     body = "".join(_paragraph(f"PADDING {index}") for index in range(padding)) + content
@@ -83,6 +89,8 @@ def _docx(*, pictures: bool, padding: int = 0, cell: bool = False) -> bytes:
             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
             '<Override PartName="/word/document.xml" '
             'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            '<Override PartName="/word/styles.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
             "</Types>"
         ),
         "_rels/.rels": (
@@ -93,6 +101,8 @@ def _docx(*, pictures: bool, padding: int = 0, cell: bool = False) -> bytes:
         ),
         "word/_rels/document.xml.rels": (
             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rIdStyles" Target="styles.xml" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"/>'
             '<Relationship Id="rIdSquare" Target="media/square.png" '
             'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/>'
             '<Relationship Id="rIdCircle" Target="media/circle.png" '
@@ -104,6 +114,18 @@ def _docx(*, pictures: bool, padding: int = 0, cell: bool = False) -> bytes:
             '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
             '<w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1701"/></w:sectPr>'
             "</w:body></w:document>"
+        ),
+        # The original minimal fixture omitted styles: Word supplied Calibri
+        # 11 / 1.08 / 8pt after, while dxpdf supplied Times New Roman 12 / no
+        # spacing. Record the Word defaults so the comparison is portable.
+        "word/styles.xml": (
+            f"<w:styles {_NAMESPACES}><w:docDefaults>"
+            '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>'
+            '<w:sz w:val="22"/></w:rPr></w:rPrDefault>'
+            '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="259" w:lineRule="auto"/>'
+            "</w:pPr></w:pPrDefault></w:docDefaults>"
+            '<w:style w:type="table" w:styleId="ProbeTable"><w:name w:val="Probe Table"/></w:style>'
+            "</w:styles>"
         ),
     }
     stream = BytesIO()
@@ -182,15 +204,43 @@ def test_text_after_the_pictures_keeps_its_place(cell: bool) -> None:
     for needle in ("ANCHOR", "LINE AFTER", "NEXT"):
         assert _text_top(with_pictures, needle) == _text_top(without_pictures, needle)
     if cell:
-        # The cell grows to hold the pictures, so what follows the table starts below them.
-        _page, anchor_top = _text_top(with_pictures, "ANCHOR")
-        _page, after_table_top = _text_top(with_pictures, "AFTER TABLE")
-        assert after_table_top < anchor_top - _SIDE / 12700
+        # Word's wrapNone drawings overflow the row: following body text
+        # must not move either. Painted bounds matter only for page-fit.
+        assert _text_top(with_pictures, "AFTER TABLE") == _text_top(without_pictures, "AFTER TABLE")
+
+
+@pytest.mark.parametrize("styled", [False, True], ids=["unstyled", "styled"])
+def test_cell_column_anchor_is_not_shifted_by_page_margin_twice(styled: bool) -> None:
+    (page, *rest) = _pages(convert_docx_to_pdf(_docx(pictures=True, cell=True, styled=styled)))
+    assert not rest
+    square = _box(page, "green")
+    assert square is not None
+    # Word export: left margin 1701/20 pt + column-relative 720000/12700 pt.
+    expected_left = 1701 / 20 + 720000 / 12700
+    assert abs(square[0] - expected_left) <= 2
+    assert abs(square[1] - 1134 / 20) <= 2
+
+
+@pytest.mark.skipif(
+    os.environ.get("CARBOTEK_WORD_REFERENCE_FONTS") != "1",
+    reason="Word reference requires the same installed Calibri font",
+)
+@pytest.mark.parametrize("cell", [False, True], ids=["body", "cell"])
+def test_text_matches_word_export(cell: bool) -> None:
+    import json
+    from pathlib import Path
+
+    reference = json.loads(Path(__file__).with_name("pdf_floating_images_word.json").read_text())
+    pdf = convert_docx_to_pdf(_docx(pictures=True, cell=cell))
+    for needle, (expected_page, expected_top) in reference["cell" if cell else "body"].items():
+        page, top = _text_top(pdf, needle)
+        assert page == expected_page
+        assert abs(top - expected_top) <= 0.75, f"{needle}: PDF {top}, Word {expected_top}"
 
 
 def _padding_near_page_bottom(cell: bool) -> int:
     """Most padding paragraphs that still keep the whole text on the first page."""
-    padding = 30
+    padding = 0
     while _text_top(convert_docx_to_pdf(_docx(pictures=False, padding=padding + 1, cell=cell)), "NEXT")[0] == 0:
         padding += 1
     return padding
@@ -207,3 +257,14 @@ def test_pictures_that_do_not_fit_move_to_the_next_page_whole(cell: bool) -> Non
     assert square is not None
     left, top, right, bottom = square
     assert _red(pages[1].getpixel(((left + right) // 2, (top + bottom) // 2)))
+
+
+def test_other_cell_line_cuts_cannot_strand_a_floating_picture() -> None:
+    padding = _padding_near_page_bottom(False)
+    pdf = convert_docx_to_pdf(_docx(pictures=True, padding=padding, cell=True, mixed_cell=True))
+    pages = _pages(pdf)
+    assert len(pages) == 2
+    assert _box(pages[0], "green") is None
+    assert _box(pages[0], "red") is None
+    assert _box(pages[1], "green") is not None
+    assert _text_top(pdf, "ANCHOR")[0] == _text_top(pdf, "OTHER 3")[0] == 1
