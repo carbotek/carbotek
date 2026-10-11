@@ -7,9 +7,15 @@ from zipfile import ZipFile
 import pytest
 from PIL import Image, ImageCms
 
-from carbotek import Engine, render_pdf
+from carbotek import Engine, _native_adapter, render_pdf
 from carbotek.errors import ConvertError, ValidationError
 from carbotek.pdf import convert as conversion
+
+
+@pytest.fixture(autouse=True)
+def fake_converter_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests fake the dxpdf package: the bundled engine must not take precedence."""
+    monkeypatch.setattr(_native_adapter, "_pdf", None)
 
 
 def package(image: bytes) -> bytes:
