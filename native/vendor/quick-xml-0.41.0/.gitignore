@@ -1,0 +1,6 @@
+# Build artifacts from checking/testing this patch in isolation (see
+# PATCH.md's last section) — not part of the vendored source, and the root
+# `Cargo.lock` (which the parent workspace's `[patch.crates-io]` actually
+# builds against) is what matters, not this directory's own.
+/target
+/Cargo.lock

@@ -19,7 +19,9 @@
 
 Render DOCX and XLSX templates with Carbone-style markers (`{d.name}`, loops, conditions,
 formatters, images, barcodes, HTML, hyperlinks, colors) into DOCX, XLSX or PDF from Python.
-There is no LibreOffice: PDF is produced by [`dxpdf`](https://pypi.org/project/dxpdf/).
+There is no LibreOffice: PDF is produced by a bundled copy of [dxpdf](https://github.com/nerdy-pro/dxpdf)
+with layout fixes for floating pictures (a signature over a stamp stays in place,
+see [CARBOTEK.md](https://github.com/carbotek/carbotek/blob/main/native/vendor/dxpdf/CARBOTEK.md)).
 
 carbotek is a Python port of the DOCX and XLSX engine of [Carbone](https://github.com/carboneio/carbone)
 **v3.2.3**, the last Carbone release under the Apache License 2.0. The template syntax is compatible
@@ -50,6 +52,10 @@ A universal `py3-none-any` wheel is also published for environments without Rust
 an available platform wheel; select the universal wheel explicitly to install only the Python
 renderer. From an unpacked source distribution, build it with
 `uv run --no-project --with build --with setuptools --with wheel python tools/build_pure_wheel.py --out dist`.
+
+The PDF engine is part of the Linux wheels and does not depend on `CARBOTEK_NATIVE`. A source or
+universal-wheel install has no bundled engine: install `carbotek[pdf-fallback]` to convert with the
+upstream `dxpdf` package instead, without the layout fixes.
 
 ## Library
 
@@ -207,6 +213,7 @@ the optional image downloads.
   - For a task queue (for example taskiq or Celery), a synchronous task with process-based workers scales best, because rendering holds the GIL.
 - **Map `CarbotekError` to client errors (4xx)** by its `code`. Any other exception is a server error.
 - **Install the template fonts in the container** (or metric-compatible fonts such as Carlito/Caladea). PDF uses system fonts.
+  On `python:3.15-slim` images also install fontconfig (its configuration and libexpat are not in the image): `apt-get install -y fontconfig`.
 
 ```python
 import asyncio
@@ -246,6 +253,7 @@ Deliberate, documented differences from the JavaScript engine:
 
 ```bash
 uv sync                      # builds the native extension; needs the Rust toolchain from rust-toolchain.toml
+                             # (without the PDF engine: PDF tests then use the dxpdf package)
 uv run ruff check . && uv run ruff format --check .
 uv run pyright               # strict mode, per-file headers
 uv run tach check            # layer boundaries, see tach.toml

@@ -64,7 +64,7 @@ def main() -> None:
             "packages": sorted(package_data),
             "package_dir": {"": "src"},
             "package_data": package_data,
-            "license_files": ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md", "licenses/*"],
+            "license_files": ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md", "licenses/**/*.txt"],
             "entry_points": {"console_scripts": [f"{name}={target}" for name, target in project["scripts"].items()]},
             "zip_safe": False,
         }

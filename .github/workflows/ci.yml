@@ -41,14 +41,38 @@ jobs:
         working-directory: native
         run: PYO3_PYTHON="$(cd .. && uv run python -c 'import sys; print(sys.executable)')" cargo test
 
+  # The patched dxpdf copy: its own regression tests for the wrapNone layout fix.
+  dxpdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y clang ninja-build libfontconfig1-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/vendor/dxpdf
+      - run: cargo test --manifest-path native/vendor/dxpdf/Cargo.toml --lib wrap_none
+      - run: cargo test --manifest-path native/vendor/dxpdf/Cargo.toml --test wrap_none_signature
+
   wheel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: PyO3/maturin-action@v1
+        env:
+          # Skia is built from source by skia-bindings, as in dxpdf's own wheel workflow:
+          # clang only, pointed at gcc-toolset-13's libstdc++ (AlmaLinux 8 ships GCC 8).
+          CC: clang
+          CXX: clang++
+          CFLAGS: --gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr
+          CXXFLAGS: --gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr
+          BINDGEN_EXTRA_CLANG_ARGS: --gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr
+          SKIA_GN_ARGS: 'extra_cflags+=["--gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr"]'
         with:
-          manylinux: auto
-          args: --release --out dist -i python3.15
+          manylinux: 2_28
+          args: --release --features pyo3/abi3-py315,pdf --out dist -i python3.15
+          before-script-linux: dnf install -y fontconfig-devel clang ninja-build gcc-toolset-13
+          # maturin-action forwards CC/CXX/CFLAGS itself, but not SKIA_* or BINDGEN_*.
+          docker-options: -e SKIA_GN_ARGS -e BINDGEN_EXTRA_CLANG_ARGS
       - uses: actions/upload-artifact@v5
         with:
           name: wheel
@@ -66,9 +90,11 @@ jobs:
         with:
           name: wheel
           path: dist
+      # PDF needs fontconfig's configuration and libexpat (not in the slim image) and some fonts.
+      - run: apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core
       - run: |
-          pip install --root-user-action=ignore --only-binary=:all: dist/*.whl pytest pytest-xdist
-      - run: CARBOTEK_NATIVE=1 python -c "import carbotek; from carbotek._native_adapter import native_available; assert native_available(); assert 'site-packages' in carbotek.__file__"
+          pip install --root-user-action=ignore --only-binary=:all: dist/*.whl pytest pytest-xdist pypdfium2==5.14.0
+      - run: CARBOTEK_NATIVE=1 python -c "import carbotek; from carbotek._native_adapter import native_available, native_pdf_available; assert native_available() and native_pdf_available(); assert 'site-packages' in carbotek.__file__"
       - name: Tests against the installed wheel
         run: |
           mkdir /tmp/run && cp -r tests tools native pyproject.toml /tmp/run/
@@ -88,7 +114,7 @@ jobs:
           uv build --sdist --out-dir "$RUNNER_TEMP/sdist"
           uv venv "$RUNNER_TEMP/sdist-check"
           python="$RUNNER_TEMP/sdist-check/bin/python"
-          uv pip install --python "$python" "$RUNNER_TEMP"/sdist/*.tar.gz pytest pytest-xdist
+          uv pip install --python "$python" "$RUNNER_TEMP"/sdist/*.tar.gz pytest pytest-xdist dxpdf==0.8.1
           CARBOTEK_NATIVE=1 "$python" -c "import carbotek; from carbotek._native_adapter import native_available; assert native_available(); assert 'site-packages' in carbotek.__file__"
           "$python" -m pytest -n auto -q tests -p no:cacheprovider
           mkdir "$RUNNER_TEMP/unpacked"
@@ -96,7 +122,7 @@ jobs:
           cd "$RUNNER_TEMP/unpacked"
           uv run --no-project --with build --with setuptools --with wheel python tools/build_pure_wheel.py --out "$RUNNER_TEMP/pure"
           uv venv "$RUNNER_TEMP/pure-check"
-          uv pip install --python "$RUNNER_TEMP/pure-check/bin/python" "$RUNNER_TEMP"/pure/*.whl pytest pytest-xdist
+          uv pip install --python "$RUNNER_TEMP/pure-check/bin/python" "$RUNNER_TEMP"/pure/*.whl pytest pytest-xdist dxpdf==0.8.1
           "$RUNNER_TEMP/pure-check/bin/python" -c "import carbotek; from carbotek._native_adapter import native_available; assert not native_available(); assert 'site-packages' in carbotek.__file__"
           cd "$GITHUB_WORKSPACE"
           "$RUNNER_TEMP/pure-check/bin/python" -m pytest -n auto -q tests -p no:cacheprovider

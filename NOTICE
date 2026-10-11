@@ -10,4 +10,9 @@ Copyright (c) CarboneIO SAS and contributors,
 licensed under the Apache License, Version 2.0 (see licenses/Carbone-Apache-2.0.txt).
 The original JavaScript code was translated to Python and Rust and substantially modified.
 
+The PDF engine is a modified copy of dxpdf 0.8.1 (https://github.com/nerdy-pro/dxpdf),
+Copyright (c) 2026 nerdy.pro, licensed under the MIT License (see licenses/dxpdf-MIT.txt).
+The modifications are described in native/vendor/dxpdf/CARBOTEK.md. It links Skia and the
+libraries listed in THIRD_PARTY_LICENSES.md.
+
 carbotek is not affiliated with or endorsed by CarboneIO SAS.

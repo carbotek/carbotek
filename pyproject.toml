@@ -5,7 +5,7 @@ description = "Render DOCX/XLSX templates with Carbone-style markers to DOCX, XL
 readme = "README.md"
 requires-python = ">=3.15"
 license = "PolyForm-Noncommercial-1.0.0"
-license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md", "licenses/*"]
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.md", "licenses/**/*.txt"]
 keywords = ["docx", "xlsx", "pdf", "template", "report", "carbone", "document-generation"]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -19,7 +19,6 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "dxpdf>=0.8,<1",
   "lxml>=5.3,<7",
   "pillow>=11,<13",
   "python-barcode>=0.16,<1",
@@ -33,11 +32,18 @@ authors = [{ name = "Carbotek", email = "337455888+carbotek@users.noreply.github
 Homepage = "https://github.com/carbotek/carbotek"
 Issues = "https://github.com/carbotek/carbotek/issues"
 
+[project.optional-dependencies]
+# Only for builds without the bundled PDF engine (source or pure-Python installs): upstream dxpdf,
+# without the carbotek layout fixes.
+pdf-fallback = ["dxpdf>=0.8,<1"]
+
 [project.scripts]
 carbotek = "carbotek.cli:main"
 
 [dependency-groups]
 dev = [
+    "dxpdf==0.8.1",
+    "pypdfium2==5.14.0",
     "pyright==1.1.414",
     "pytest==9.1.1",
     "pytest-xdist==3.8.0",

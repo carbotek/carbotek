@@ -17,7 +17,7 @@
 
 [English](https://github.com/carbotek/carbotek/blob/main/README.md) | **Русский**
 
-Рендеринг DOCX- и XLSX-шаблонов с маркерами в стиле Carbone в DOCX, XLSX или PDF из Python. Поддерживаются `{d.name}`, циклы, условия, форматтеры, картинки, штрихкоды, HTML, ссылки и цвета. LibreOffice не нужен: PDF строится через [`dxpdf`](https://pypi.org/project/dxpdf/).
+Рендеринг DOCX- и XLSX-шаблонов с маркерами в стиле Carbone в DOCX, XLSX или PDF из Python. Поддерживаются `{d.name}`, циклы, условия, форматтеры, картинки, штрихкоды, HTML, ссылки и цвета. LibreOffice не нужен: PDF строится встроенной копией [dxpdf](https://github.com/nerdy-pro/dxpdf) с исправлениями вёрстки плавающих картинок (подпись поверх печати остаётся на месте, см. [CARBOTEK.md](https://github.com/carbotek/carbotek/blob/main/native/vendor/dxpdf/CARBOTEK.md)).
 
 carbotek — Python-порт DOCX- и XLSX-движка [Carbone](https://github.com/carboneio/carbone) **v3.2.3**, последней версии под Apache License 2.0. Синтаксис шаблонов совместим с Carbone **5.14.4**. Поведение сверено с JS-движком: дифференциальный корпус и оракулы форматтеров.
 
@@ -37,6 +37,10 @@ pip install carbotek        # или: uv add carbotek
 платформы без готового колеса он собирается из исходного архива, и тогда нужен Rust 1.87+.
 `CARBOTEK_NATIVE=0` выключает ускоритель, `CARBOTEK_NATIVE=1` превращает его отсутствие в ошибку
 импорта; переменная читается один раз, при импорте `carbotek`.
+
+PDF-движок входит в Linux-колёса и от `CARBOTEK_NATIVE` не зависит. При установке из исходников
+или универсального колеса встроенного движка нет: поставьте `carbotek[pdf-fallback]`, тогда PDF
+строится пакетом `dxpdf` с PyPI, без исправлений вёрстки.
 
 ## Библиотека
 
@@ -191,6 +195,7 @@ API синхронный и нагружает CPU. На вход и выход 
   - Для очереди задач (taskiq, Celery) лучше всего масштабируется синхронная задача с воркерами-процессами, потому что рендер держит GIL.
 - **`CarbotekError` отдавайте клиенту как 4xx** по `code`. Любое другое исключение — ошибка сервера.
 - **Установите в контейнер шрифты шаблонов** или метрически совместимые замены (Carlito, Caladea): для PDF берутся системные шрифты.
+  В образах `python:3.15-slim` также поставьте fontconfig (его настроек и libexpat в образе нет): `apt-get install -y fontconfig`.
 
 ```python
 import asyncio

@@ -38,6 +38,7 @@ class _Native(Protocol):
     def digit_currency_cents(self, value: Any) -> str | None: ...
     def join_utf8(self, parts: list[str | bytes]) -> bytes: ...
     def decode_data_uri(self, value: Any) -> bytes | None: ...
+    def convert_pdf(self, docx: bytes, image_dpi: float) -> bytes: ...
 
 
 def _load(setting: str) -> _Native | None:
@@ -54,7 +55,7 @@ def _load(setting: str) -> _Native | None:
     except PackageNotFoundError:
         installed_version = None
     native_version = getattr(_native, "PACKAGE_VERSION", None)
-    compatible = getattr(_native, "API_VERSION", None) == 2 and getattr(_native, "OPERATIONS", None) == OPERATIONS
+    compatible = getattr(_native, "API_VERSION", None) == 3 and getattr(_native, "OPERATIONS", None) == OPERATIONS
     if installed_version is not None:
         normalized = re.sub(
             r"-(alpha|beta|rc)\.?(\d+)$",
@@ -73,6 +74,9 @@ def _load(setting: str) -> _Native | None:
 
 # Tests switch backends by replacing this attribute (monkeypatch), not the environment.
 _native: _Native | None = _load(os.environ.get("CARBOTEK_NATIVE", "").strip().lower())
+# The PDF engine is not an accelerator: CARBOTEK_NATIVE does not switch it off, and wheels without
+# it (a local or source build without the pdf feature) fall back to the dxpdf package.
+_pdf: _Native | None = _native or _load("")
 
 
 def native_available() -> bool:
@@ -98,3 +102,15 @@ def native_utf8_joiner() -> Callable[[list[str | bytes]], bytes] | None:
 def native_decode_data_uri(value: Any) -> bytes | None:
     native = _native
     return native.decode_data_uri(value) if native is not None else None
+
+
+def native_pdf_available() -> bool:
+    return _pdf is not None and hasattr(_pdf, "convert_pdf")
+
+
+def native_convert_pdf(document: bytes, image_dpi: int) -> bytes | None:
+    """PDF from the bundled, patched dxpdf; None when this build has no PDF engine."""
+    native = _pdf
+    if native is None or not hasattr(native, "convert_pdf"):
+        return None
+    return native.convert_pdf(document, float(image_dpi))
