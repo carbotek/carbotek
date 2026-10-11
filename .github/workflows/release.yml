@@ -41,18 +41,30 @@ jobs:
     strategy:
       matrix:
         include:
-          - { runner: ubuntu-latest, target: x86_64, manylinux: auto }
-          - { runner: ubuntu-24.04-arm, target: aarch64, manylinux: auto }
+          - { runner: ubuntu-latest, target: x86_64, manylinux: 2_28 }
+          - { runner: ubuntu-24.04-arm, target: aarch64, manylinux: 2_28 }
     steps:
       - uses: actions/checkout@v5
       - name: Set version
         shell: bash
         run: python tools/release_version.py "${{ needs.check.outputs.version }}" --write-cargo
       - uses: PyO3/maturin-action@v1
+        env:
+          # Skia is built from source by skia-bindings, as in dxpdf's own wheel workflow:
+          # clang only, pointed at gcc-toolset-13's libstdc++ (AlmaLinux 8 ships GCC 8).
+          CC: clang
+          CXX: clang++
+          CFLAGS: --gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr
+          CXXFLAGS: --gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr
+          BINDGEN_EXTRA_CLANG_ARGS: --gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr
+          SKIA_GN_ARGS: 'extra_cflags+=["--gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr"]'
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist -i python3.15
+          args: --release --features pdf --out dist -i python3.15
+          before-script-linux: dnf install -y fontconfig-devel clang ninja-build gcc-toolset-13
+          # maturin-action forwards CC/CXX/CFLAGS itself, but not SKIA_* or BINDGEN_*.
+          docker-options: -e SKIA_GN_ARGS -e BINDGEN_EXTRA_CLANG_ARGS
       - uses: actions/upload-artifact@v5
         with:
           name: wheels-linux-${{ matrix.target }}-${{ matrix.manylinux }}
@@ -88,7 +100,7 @@ jobs:
         run: python tools/release_version.py "${{ needs.check.outputs.version }}" --write-cargo
       - run: uv run --no-project --with build --with setuptools --with wheel python tools/build_pure_wheel.py --out dist
       - run: uv venv pure-check
-      - run: uv pip install --python pure-check/bin/python dist/*-py3-none-any.whl pytest
+      - run: uv pip install --python pure-check/bin/python dist/*-py3-none-any.whl pytest dxpdf==0.8.1
       - run: pure-check/bin/python -c "import carbotek; from carbotek._native_adapter import native_available; assert not native_available()"
       - run: pure-check/bin/python -m pytest -q tests -p no:cacheprovider
       - uses: actions/upload-artifact@v5

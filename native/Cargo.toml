@@ -19,3 +19,9 @@ pyo3 = "0.29"
 base64 = "0.23"
 # Shortest round-trip digits with ties to even, as JS and Python repr print them.
 ryu = "1"
+# Patched copy of dxpdf 0.8.1 (DOCX to PDF), see vendor/dxpdf/CARBOTEK.md. The python feature of
+# dxpdf is not used: carbotek exposes its own convert_pdf.
+dxpdf = { path = "vendor/dxpdf", default-features = false, features = ["subset-fonts"], optional = true }
+
+[features]
+pdf = ["dep:dxpdf"]

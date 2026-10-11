@@ -1,5 +1,5 @@
 # pyright: strict, reportPrivateUsage=false
-"""DOCX-to-PDF adapter backed by the native dxpdf binding."""
+"""DOCX-to-PDF conversion with the bundled, patched dxpdf (native/vendor/dxpdf)."""
 
 import logging
 import re
@@ -10,6 +10,7 @@ from zipfile import BadZipFile, ZipFile
 
 lazy from PIL import Image, ImageCms
 
+from carbotek._native_adapter import native_convert_pdf
 from carbotek.errors import ConvertError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -21,18 +22,32 @@ def convert_docx_to_pdf(document: bytes, *, image_dpi: int = 220) -> bytes:
         raise ValidationError("document must be bytes")
     if type(image_dpi) is not int or not 1 <= image_dpi <= 2400:
         raise ValidationError("image_dpi must be an integer between 1 and 2400")
+    prepared = _normalize_profiled_pngs(document)
     try:
-        converter = getattr(import_module("dxpdf"), "convert", None)
-        if not callable(converter):
-            raise ConvertError("dxpdf does not expose convert()")
-        result: Any = converter(_normalize_profiled_pngs(document), image_dpi=image_dpi)
-    except ImportError as error:  # pragma: no cover - only possible in an incomplete install.
-        raise ConvertError("dxpdf is not installed") from error
+        result: Any = native_convert_pdf(prepared, image_dpi)
+        if result is None:
+            result = _convert_with_dxpdf_package(prepared, image_dpi)
+    except ConvertError:
+        raise
     except Exception as error:
         raise ConvertError(str(error)) from error
     if not isinstance(result, bytes):
         raise ConvertError("dxpdf returned an invalid conversion result")
     return result
+
+
+def _convert_with_dxpdf_package(document: bytes, image_dpi: int) -> Any:
+    """Fallback for builds without the bundled PDF engine: the upstream dxpdf package, if installed."""
+    try:
+        module = import_module("dxpdf")
+    except ImportError as error:
+        raise ConvertError(
+            "PDF conversion needs a carbotek wheel with the bundled PDF engine or the dxpdf package"
+        ) from error
+    converter = getattr(module, "convert", None)
+    if not callable(converter):
+        raise ConvertError("dxpdf does not expose convert()")
+    return converter(document, image_dpi=image_dpi)
 
 
 def warn_unsupported_media(document: bytes) -> None:

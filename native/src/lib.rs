@@ -536,14 +536,32 @@ fn decode_data_uri<'py>(value: &Bound<'py, PyAny>) -> Option<Bound<'py, PyBytes>
     Some(PyBytes::new(value.py(), &decoded))
 }
 
+/// DOCX bytes to PDF bytes with the bundled, patched dxpdf (vendor/dxpdf/CARBOTEK.md).
+///
+/// The bytes are copied while the GIL is held, then the conversion runs without it.
+#[cfg(feature = "pdf")]
+#[pyfunction]
+fn convert_pdf<'py>(py: Python<'py>, docx: &[u8], image_dpi: f32) -> PyResult<Bound<'py, PyBytes>> {
+    let docx = docx.to_vec();
+    let pdf = py
+        .detach(|| {
+            let options = dxpdf::RenderOptions::default().with_image_dpi(image_dpi);
+            dxpdf::convert_with_options(&docx, &options)
+        })
+        .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))?;
+    Ok(PyBytes::new(py, &pdf))
+}
+
 #[pymodule(gil_used = false)]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add("API_VERSION", 2)?;
+    module.add("API_VERSION", 3)?;
     module.add("PACKAGE_VERSION", env!("CARGO_PKG_VERSION"))?;
     module.add_class::<PlainSection>()?;
     module.add_function(wrap_pyfunction!(digit_currency_cents, module)?)?;
     module.add_function(wrap_pyfunction!(join_utf8, module)?)?;
     module.add_function(wrap_pyfunction!(decode_data_uri, module)?)?;
+    #[cfg(feature = "pdf")]
+    module.add_function(wrap_pyfunction!(convert_pdf, module)?)?;
     let operations = PyDict::new(module.py());
     for (name, code) in OPERATIONS {
         operations.set_item(name, code)?;

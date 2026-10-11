@@ -6,6 +6,9 @@
 
 line-length = 120
 
+# The bundled dxpdf copy keeps its upstream code style.
+extend-exclude = ["native/vendor"]
+
 # target-version is taken from project.requires-python in pyproject.toml.
 
 [lint]
