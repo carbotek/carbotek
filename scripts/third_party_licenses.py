@@ -36,7 +36,10 @@ _FILES = {
 # Crates published without a license file: the text of their sibling crate (same authors, same license).
 _TEXT_FROM = {"alloc-stdlib": "alloc-no-stdlib"}
 # Path dependencies have no registry source.
-_PATH_CRATES = {"dxpdf": ROOT / "native" / "vendor" / "dxpdf"}
+_PATH_CRATES = {
+    "dxpdf": ROOT / "native" / "vendor" / "dxpdf",
+    "quick-xml": ROOT / "native" / "vendor" / "quick-xml-0.41.0",
+}
 # C/C++ libraries compiled into Skia by skia-bindings (embed-freetype, textlayout) and linked statically.
 _NATIVE_LIBRARIES = (
     ("Skia", "BSD-3-Clause", "Skia-BSD-3-Clause.txt"),

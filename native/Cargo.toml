@@ -25,3 +25,8 @@ dxpdf = { path = "vendor/dxpdf", default-features = false, features = ["subset-f
 
 [features]
 pdf = ["dep:dxpdf"]
+
+# dxpdf builds with a patched quick-xml (vendor/quick-xml-0.41.0/PATCH.md); a [patch] in a
+# dependency's manifest is ignored, so it is repeated here.
+[patch.crates-io]
+quick-xml = { path = "vendor/quick-xml-0.41.0" }

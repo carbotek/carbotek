@@ -61,7 +61,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --features pdf --out dist -i python3.15
+          args: --release --features pyo3/abi3-py315,pdf --out dist -i python3.15
           before-script-linux: dnf install -y fontconfig-devel clang ninja-build gcc-toolset-13
           # maturin-action forwards CC/CXX/CFLAGS itself, but not SKIA_* or BINDGEN_*.
           docker-options: -e SKIA_GN_ARGS -e BINDGEN_EXTRA_CLANG_ARGS

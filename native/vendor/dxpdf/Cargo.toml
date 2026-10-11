@@ -235,7 +235,7 @@ icu_segmenter = { version = "2.2.0", default-features = false, features = ["auto
 # downstream `Cargo.toml` depending on `dxpdf` resolves the unpatched
 # upstream quick-xml. That gap is accepted, not overlooked; see `PATCH.md`.
 [patch.crates-io]
-quick-xml = { path = "vendor/quick-xml-0.41.0" }
+quick-xml = { path = "../quick-xml-0.41.0" }
 
 [features]
 default = ["subset-fonts"]
@@ -261,10 +261,4 @@ lopdf = { version = "0.44", default-features = false }
 # the crate, the wheel, nor the `.deb`.
 toml = "1"
 
-[[bench]]
-name = "convert_bench"
-harness = false
 
-[[bench]]
-name = "parse_bench"
-harness = false

@@ -11,6 +11,13 @@ This directory is a patched copy of [dxpdf](https://github.com/nerdy-pro/dxpdf) 
   apart from the changes below. Upstream tests, benchmarks, packaging files and the Go bindings are
   not copied.
 
+## quick-xml
+
+dxpdf builds with a patched quick-xml 0.41.0 (`native/vendor/quick-xml-0.41.0`, MIT, see its
+`PATCH.md`), as upstream's own wheels do. `native/Cargo.toml` applies it with `[patch.crates-io]`,
+because a `[patch]` in a dependency's manifest is ignored. Upstream's benchmark targets are removed
+from the copied `Cargo.toml`.
+
 ## Changes
 
 Floating pictures without text wrapping (`wrapNone`), for example a signature drawn over a stamp:

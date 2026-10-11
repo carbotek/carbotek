@@ -69,7 +69,7 @@ jobs:
           SKIA_GN_ARGS: 'extra_cflags+=["--gcc-toolchain=/opt/rh/gcc-toolset-13/root/usr"]'
         with:
           manylinux: 2_28
-          args: --release --features pdf --out dist -i python3.15
+          args: --release --features pyo3/abi3-py315,pdf --out dist -i python3.15
           before-script-linux: dnf install -y fontconfig-devel clang ninja-build gcc-toolset-13
           # maturin-action forwards CC/CXX/CFLAGS itself, but not SKIA_* or BINDGEN_*.
           docker-options: -e SKIA_GN_ARGS -e BINDGEN_EXTRA_CLANG_ARGS
@@ -90,6 +90,8 @@ jobs:
         with:
           name: wheel
           path: dist
+      # The bundled fontconfig needs libexpat, which the slim image does not ship; PDF also needs fonts.
+      - run: apt-get update && apt-get install -y --no-install-recommends libexpat1 fonts-dejavu-core
       - run: |
           pip install --root-user-action=ignore --only-binary=:all: dist/*.whl pytest pytest-xdist pypdfium2==5.14.0
       - run: CARBOTEK_NATIVE=1 python -c "import carbotek; from carbotek._native_adapter import native_available, native_pdf_available; assert native_available() and native_pdf_available(); assert 'site-packages' in carbotek.__file__"
