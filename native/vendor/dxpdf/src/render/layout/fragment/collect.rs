@@ -860,6 +860,8 @@ where
                                 rel_id: rel_id.as_str().to_string(),
                                 image_data: None,
                                 src_rect: crate::render::resolve::images::extract_src_rect(img),
+                                transform:
+                                    crate::render::resolve::images::extract_picture_transform(img),
                             });
                         }
                     }

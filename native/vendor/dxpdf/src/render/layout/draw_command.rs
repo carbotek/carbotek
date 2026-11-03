@@ -104,6 +104,8 @@ pub enum DrawCommand {
     Image {
         rect: PtRect,
         image_data: MediaEntry,
+        transform: crate::render::resolve::images::PictureTransform,
+        page_anchor: PageAnchor,
         /// §20.1.10.48 `a:srcRect` — fractional source crop in `[0, 1]`
         /// relative to the image's natural extent, applied before the image
         /// is stretched into `rect`. `None` draws the whole image.
@@ -292,7 +294,39 @@ pub struct ResolvedPattern {
     pub bg: Rgba,
 }
 
+/// A non-wrapping cell picture can reference the page on either axis. Preserve
+/// those coordinates through cell/table translations and resolve only when its
+/// final page (including the logical page parity) is known.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PageAnchor {
+    pub x: Option<(Pt, Pt)>,
+    pub y: Option<(Pt, Pt)>,
+}
+
+impl PageAnchor {
+    fn resolve(&mut self, rect: &mut PtRect, parity: super::section::PageParity) {
+        let at = |(odd, even)| match parity {
+            super::section::PageParity::Odd => odd,
+            super::section::PageParity::Even => even,
+        };
+        if let Some(x) = self.x.take() {
+            rect.origin.x = at(x);
+        }
+        if let Some(y) = self.y.take() {
+            rect.origin.y = at(y);
+        }
+    }
+}
+
 impl DrawCommand {
+    pub fn resolve_page_anchor(&mut self, parity: super::section::PageParity) {
+        if let Self::Image {
+            rect, page_anchor, ..
+        } = self
+        {
+            page_anchor.resolve(rect, parity);
+        }
+    }
     /// Shift all coordinates by `(dx, dy)`.
     pub fn shift(&mut self, dx: Pt, dy: Pt) {
         match self {
@@ -351,9 +385,19 @@ impl DrawCommand {
             DrawCommand::Underline { line, .. } | DrawCommand::Line { line, .. } => {
                 Some((line.start.y.min(line.end.y), line.start.y.max(line.end.y)))
             }
-            DrawCommand::Image { rect, .. }
-            | DrawCommand::EmojiCluster { rect, .. }
-            | DrawCommand::Rect { rect, .. } => {
+            DrawCommand::Image {
+                rect,
+                transform,
+                page_anchor,
+                ..
+            } => {
+                if page_anchor.y.is_some() {
+                    return None;
+                }
+                let bounds = transform.bounds(*rect);
+                Some((bounds.origin.y, bounds.origin.y + bounds.size.height))
+            }
+            DrawCommand::EmojiCluster { rect, .. } | DrawCommand::Rect { rect, .. } => {
                 Some((rect.origin.y, rect.origin.y + rect.size.height))
             }
             // `extent` is the shape's unrotated bounding box; a rotation can
@@ -681,12 +725,14 @@ mod tests {
             (
                 "Image",
                 DrawCommand::Image {
+                    page_anchor: Default::default(),
                     rect,
                     image_data: crate::render::resolve::images::MediaEntry {
                         data: std::sync::Arc::from(&[0u8][..]),
                         format: crate::model::ImageFormat::Png,
                     },
                     src_rect: None,
+                    transform: Default::default(),
                 },
             ),
             (

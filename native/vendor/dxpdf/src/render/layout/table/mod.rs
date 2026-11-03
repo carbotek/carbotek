@@ -108,7 +108,14 @@ fn painted_group_height(
         .iter()
         .fold(flow_height, |height, command| {
             let bottom = match command {
-                DrawCommand::Image { rect, .. } => rect.origin.y + rect.size.height,
+                DrawCommand::Image {
+                    rect, page_anchor, ..
+                } => {
+                    if page_anchor.y.is_some() {
+                        return height;
+                    }
+                    rect.origin.y + rect.size.height
+                }
                 DrawCommand::Path { origin, extent, .. } => origin.y + extent.height,
                 _ => Pt::ZERO,
             };
@@ -639,12 +646,14 @@ mod tests {
         } = &mut cell.blocks[0]
         {
             floating_images.push(FloatingImage {
+                page_anchor: Default::default(),
                 image_data: MediaEntry {
                     data: std::sync::Arc::from(&b""[..]),
                     format: crate::model::ImageFormat::Png,
                 },
                 size: PtSize::new(Pt::new(30.0), Pt::new(100.0)),
                 src_rect: None,
+                transform: Default::default(),
                 x: FloatingImageX::Absolute(Pt::ZERO),
                 y: FloatingImageY::RelativeToParagraph(Pt::ZERO),
                 wrap_mode: WrapMode::None,

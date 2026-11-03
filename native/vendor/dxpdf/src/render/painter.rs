@@ -449,7 +449,21 @@ fn render_page(
                 rect,
                 image_data,
                 src_rect,
+                transform,
+                ..
             } => {
+                // Transform the destination frame, after cropping and stretching,
+                // without baking another bitmap or changing the layout dimensions.
+                canvas.save();
+                let cx = (rect.origin.x + rect.size.width / 2.0).raw();
+                let cy = (rect.origin.y + rect.size.height / 2.0).raw();
+                canvas.translate((cx, cy));
+                canvas.rotate(transform.rotation, None);
+                canvas.scale((
+                    if transform.flip_h { -1.0 } else { 1.0 },
+                    if transform.flip_v { -1.0 } else { 1.0 },
+                ));
+                canvas.translate((-cx, -cy));
                 // §20.1.10.48: resolve the srcRect against the image bounds. A
                 // region reaching outside the image (negative insets) pads the
                 // frame — it becomes an in-image crop plus a shrunken `dst`,
@@ -521,6 +535,7 @@ fn render_page(
                         );
                     }
                 }
+                canvas.restore();
             }
             DrawCommand::EmojiCluster {
                 rect,
@@ -1386,9 +1401,11 @@ mod tests {
         };
         let page = || LayoutedPage {
             commands: vec![DrawCommand::Image {
+                page_anchor: Default::default(),
                 rect: rect(72.0, 72.0),
                 image_data: media.clone(),
                 src_rect: None,
+                transform: Default::default(),
             }],
             page_size: PtSize::new(Pt::new(200.0), Pt::new(200.0)),
         };
@@ -1421,9 +1438,11 @@ mod tests {
         };
         let page = || LayoutedPage {
             commands: vec![DrawCommand::Image {
+                page_anchor: Default::default(),
                 rect: rect(72.0, 72.0),
                 image_data: media.clone(),
                 src_rect: None,
+                transform: Default::default(),
             }],
             page_size: PtSize::new(Pt::new(200.0), Pt::new(200.0)),
         };

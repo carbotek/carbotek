@@ -47,6 +47,23 @@ Floating pictures without text wrapping (`wrapNone`), for example a signature dr
    truncated or different-height boxes retain the prior metrics; emoji
    measurement is unchanged.
 
+5. Picture transforms now travel from `pic:spPr/a:xfrm` through inline fragments and floating
+   images into the paint command. `painter.rs` flips and rotates the destination frame about its
+   center, after the source crop is applied. Shared media stays shared: transforms belong to the
+   placement and do not modify or re-encode the source. Page-fit continues to use the unrotated
+   layout frame: rotating an overlay must not move its paragraph or table row to another page.
+6. Non-wrapping pictures in table cells retain page/margin references on each axis separately.
+   Their absolute coordinates are resolved after pagination and header/footer placement, against
+   the final logical page parity. Table/cell translations and repeated header rows no longer add
+   local offsets to these references. Page-relative vertical positions do not inflate the row's
+   local page-fit height. Paragraph/column references keep their existing local behavior. Wrapping
+   cell drawings and VML are outside this change.
+
+Tests: `tests/regression/test_picture_geometry.py` checks rotation, both flips, crop-aware template
+image fitting, independent transforms for shared media, unchanged page-fit on rotation, mixed local/page axes,
+displaced second cells and repeated headers (including mirrored logical page numbering). All
+fixtures are generated from synthetic colored images; no customer documents are committed.
+
 Tests: unit tests `wrap_none_*` in `stacker.rs`, integration tests `tests/wrap_none_signature.rs`
 with synthetic documents in `test-files/wrap-none-*.docx` (generator: `tests/make_wrap_none_fixture.py`).
 carbotek checks the result end to end in `tests/regression/test_pdf_floating_images.py`.

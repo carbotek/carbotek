@@ -660,6 +660,12 @@ pub fn layout_document(
                 total_pages,
             },
         );
+        for (offset, page) in all_pages[info.page_range.clone()].iter_mut().enumerate() {
+            let parity = layout::section::PageParity::of_page(info.logical_page_base + offset);
+            for command in &mut page.commands {
+                command.resolve_page_anchor(parity);
+            }
+        }
     }
 
     // Render endnotes on a new page at the end of the document.

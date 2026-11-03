@@ -132,6 +132,19 @@ All template and data errors are subclasses of `carbotek.CarbotekError`. Each er
 
 Messages follow the JS engine where applicable; input and infrastructure failures have library-specific messages.
 
+### Picture geometry
+
+Image markers use `imageFit('fillWidth')` by default. `fillWidth` and `contain` calculate the
+visible source aspect ratio after Word's `a:srcRect` crop, including padding from negative insets.
+Use `{d.image:imageFit('fill')}` to keep both dimensions of the template frame explicitly.
+An absent non-wrapping floating image is removed; inline and wrapping placeholders retain their
+reserved frame with a transparent PNG.
+
+The bundled PDF engine applies picture rotation and flips about the frame's center, after cropping.
+It preserves per-picture transforms even when pictures share one media file. Non-wrapping pictures
+in table cells support page/margin references independently on each axis, including repeated table
+headers and mirrored logical page numbering. Paragraph and column references stay local to the cell.
+
 ### Images from URLs and files
 
 By default, only data URIs are loaded. Remote and local images have to be enabled explicitly:

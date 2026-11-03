@@ -42,7 +42,7 @@ _CONTENT_TYPES = "http://schemas.openxmlformats.org/package/2006/content-types"
 _MIME_EXTENSIONS = MIME_EXTENSIONS
 HTML_IMAGE_PREFIX = "__CARBOTEK_HTML_IMAGE__:"
 _DEFAULT_PNG = b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL5XQAAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
 )
 
 
@@ -91,10 +91,15 @@ class ImageSubstitution:
                     if isinstance(value, str) and value.startswith(("https:", "http:"))
                     else image_payload(value, self.config)
                 )
-                if payload is None:
-                    payload = (_DEFAULT_PNG, "image/png")
-                    marker = Marker(marker.root, marker.path, (FormatterCall("imageFit", ("fill",)),), marker.raw)
-                raw, mime = payload
+                if payload is None and _remove_missing_overlay(doc_pr):
+                    changed = True
+                    continue
+                raw, mime = payload if payload is not None else (_DEFAULT_PNG, "image/png")
+                marker = (
+                    marker
+                    if payload is not None
+                    else Marker(marker.root, marker.path, (FormatterCall("imageFit", ("fill",)),), marker.raw)
+                )
                 if mime == "image/svg+xml" and rasterize_svg:
                     try:
                         raw = rasterize_safe_svg(raw, image_dpi)
@@ -110,7 +115,7 @@ class ImageSubstitution:
             if changed:
                 replacements[part_name] = TemplatePart.from_tree(part_name, root)
         if not database:
-            return package
+            return package.replace_parts(replacements) if replacements else package
         relationship_roots: dict[str, etree._Element] = {}
         for raw, (image_id, extension, _mime) in database.items():
             replacements[f"word/media/CarbotekImage{image_id}.{extension}"] = TemplatePart(
@@ -138,6 +143,22 @@ class ImageSubstitution:
             True,
         )
         return package.replace_parts(replacements)
+
+
+def _remove_missing_overlay(doc_pr: etree._Element) -> bool:
+    """An absent non-wrapping picture must not paginate its invisible frame."""
+    drawing = doc_pr.getparent()
+    if (
+        drawing is None
+        or drawing.tag != qn("wp:anchor")
+        or drawing.find(qn("wp:wrapNone")) is None
+        or (container := drawing.getparent()) is None
+    ):
+        return False
+    container.remove(drawing)
+    if len(container) == 0 and (owner := container.getparent()) is not None:
+        owner.remove(container)
+    return True
 
 
 _IMAGE_MARKER = re.compile(rb'descr="(?:[^"]*{|__CARBOTEK_HTML_IMAGE__:)')
@@ -344,7 +365,25 @@ def _fit_extents(drawing: etree._Element, raw: bytes, mime: str, fit: str, orien
         width, height = int(extent.get("cx", "0")), int(extent.get("cy", "0"))
     except ValueError:
         return
-    image_width, image_height = dimensions
+    image_width, image_height = map(float, dimensions)
+    # Word crops the source before stretching it into the drawing frame. Fit the
+    # visible source, including negative insets (padding), rather than the raw bitmap.
+    crop = drawing.find(f".//{qn('pic:blipFill')}/{qn('a:srcRect')}")
+    if crop is not None:
+        try:
+
+            def fraction(edge: str) -> float:
+                value = crop.get(edge, "0")
+                return float(value[:-1]) / 100 if value.endswith("%") else int(value) / 100000
+
+            visible_width = 1 - fraction("l") - fraction("r")
+            visible_height = 1 - fraction("t") - fraction("b")
+        except ValueError:
+            pass
+        else:
+            if 0 < visible_width < float("inf") and 0 < visible_height < float("inf"):
+                image_width *= visible_width
+                image_height *= visible_height
     if min(width, height, image_width, image_height) <= 0:
         return
     if orientation > 4:

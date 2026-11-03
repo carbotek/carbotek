@@ -754,10 +754,12 @@ pub(super) fn emit_line_commands(
                     size,
                     image_data,
                     src_rect,
+                    transform,
                     ..
                 } => {
                     if let Some(data) = image_data {
                         commands.push(DrawCommand::Image {
+                            page_anchor: Default::default(),
                             rect: crate::render::geometry::PtRect::from_xywh(
                                 x,
                                 *cursor_y,
@@ -766,6 +768,7 @@ pub(super) fn emit_line_commands(
                             ),
                             image_data: data.clone(),
                             src_rect: *src_rect,
+                            transform: *transform,
                         });
                     }
                     x += size.width

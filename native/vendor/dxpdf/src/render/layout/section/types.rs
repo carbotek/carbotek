@@ -94,6 +94,8 @@ pub struct TableFloatInfo {
 /// A floating (anchor) image to be positioned absolutely on the page.
 #[derive(Clone)]
 pub struct FloatingImage {
+    pub transform: crate::render::resolve::images::PictureTransform,
+    pub page_anchor: super::super::draw_command::PageAnchor,
     pub image_data: MediaEntry,
     pub size: PtSize,
     /// §20.1.10.48 `a:srcRect` — fractional source crop in `[0, 1]`.
