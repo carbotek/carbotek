@@ -65,7 +65,7 @@ jobs:
           before-script-linux: dnf install -y fontconfig-devel clang ninja-build gcc-toolset-13
           # maturin-action forwards CC/CXX/CFLAGS itself, but not SKIA_* or BINDGEN_*.
           docker-options: -e SKIA_GN_ARGS -e BINDGEN_EXTRA_CLANG_ARGS
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: wheels-linux-${{ matrix.target }}-${{ matrix.manylinux }}
           path: dist
@@ -82,7 +82,7 @@ jobs:
         with:
           command: sdist
           args: --out dist
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: sdist
           path: dist
@@ -103,7 +103,7 @@ jobs:
       - run: uv pip install --python pure-check/bin/python dist/*-py3-none-any.whl pytest dxpdf==0.8.1
       - run: pure-check/bin/python -c "import carbotek; from carbotek._native_adapter import native_available; assert not native_available()"
       - run: pure-check/bin/python -m pytest -q tests -p no:cacheprovider
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: wheel-pure
           path: dist/*-py3-none-any.whl
