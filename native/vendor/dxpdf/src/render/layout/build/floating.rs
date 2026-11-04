@@ -131,10 +131,54 @@ pub(super) fn extract_floating_images(
         let h = Pt::from(img.extent.height);
         let (x, y) = resolve_anchor_position(anchor, w, h, state, frame);
 
+        // Table layout translates its local drawing commands several times and
+        // may repeat a header row on different pages. A page reference must not
+        // acquire those local offsets. Retain both parity readings until the
+        // command reaches its final page; paragraph/column axes remain local.
+        let mut page_anchor = crate::render::layout::draw_command::PageAnchor::default();
+        if frame == AnchorFrame::Stack && matches!(anchor.wrap, crate::model::TextWrap::None) {
+            use crate::model::{AnchorPosition, AnchorRelativeFrom as From};
+            let from = |position: &AnchorPosition| match position {
+                AnchorPosition::Offset { relative_from, .. }
+                | AnchorPosition::Align { relative_from, .. } => *relative_from,
+            };
+            let (page_x, page_y) = resolve_anchor_position(anchor, w, h, state, AnchorFrame::Page);
+            if matches!(
+                from(&anchor.horizontal_position),
+                From::Page
+                    | From::Margin
+                    | From::LeftMargin
+                    | From::RightMargin
+                    | From::InsideMargin
+                    | From::OutsideMargin
+            ) {
+                page_anchor.x = Some((
+                    page_x.resolve(PageParity::Odd),
+                    page_x.resolve(PageParity::Even),
+                ));
+            }
+            if matches!(
+                from(&anchor.vertical_position),
+                From::Page
+                    | From::Margin
+                    | From::TopMargin
+                    | From::BottomMargin
+                    | From::InsideMargin
+                    | From::OutsideMargin
+            ) {
+                page_anchor.y = Some((
+                    page_y.at(PageParity::Odd, Pt::ZERO),
+                    page_y.at(PageParity::Even, Pt::ZERO),
+                ));
+            }
+        }
+
         images.push(FloatingImage {
+            page_anchor,
             image_data,
             size: PtSize::new(w, h),
             src_rect: crate::render::resolve::images::extract_src_rect(img),
+            transform: crate::render::resolve::images::extract_picture_transform(img),
             x,
             y,
             wrap_mode: crate::render::layout::section::WrapMode::from_model(&anchor.wrap),
@@ -411,10 +455,12 @@ fn build_vml_floating_image(
     }
 
     Some(FloatingImage {
+        page_anchor: Default::default(),
         image_data,
         size: PtSize::new(width, height),
         // VML crops (`v:imagedata` crop*) are a separate mechanism; not modelled.
         src_rect: None,
+        transform: Default::default(),
         x,
         y: FloatingImageY::RelativeToParagraph(y),
         wrap_mode: WrapMode::None,

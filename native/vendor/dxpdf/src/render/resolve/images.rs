@@ -19,6 +19,51 @@ pub struct MediaEntry {
     pub format: ImageFormat,
 }
 
+/// Picture-local DrawingML transform, applied to the cropped frame about its center.
+/// Keep it per placement: multiple pictures can share one media entry.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PictureTransform {
+    /// Clockwise degrees (§20.1.7.6 uses 60000ths of a degree).
+    pub rotation: f32,
+    pub flip_h: bool,
+    pub flip_v: bool,
+}
+
+impl PictureTransform {
+    /// Painted bounds, distinct from the unrotated layout frame.
+    pub fn bounds(self, rect: PtRect) -> PtRect {
+        let (sin, cos) = self.rotation.to_radians().sin_cos();
+        let width = rect.size.width.raw() * cos.abs() + rect.size.height.raw() * sin.abs();
+        let height = rect.size.width.raw() * sin.abs() + rect.size.height.raw() * cos.abs();
+        PtRect::from_xywh(
+            rect.origin.x + (rect.size.width - Pt::new(width)) / 2.0,
+            rect.origin.y + (rect.size.height - Pt::new(height)) / 2.0,
+            Pt::new(width),
+            Pt::new(height),
+        )
+    }
+}
+
+pub fn extract_picture_transform(image: &Image) -> PictureTransform {
+    let Some(GraphicContent::Picture(pic)) = image.graphic.as_ref() else {
+        return PictureTransform::default();
+    };
+    let Some(transform) = pic
+        .shape_properties
+        .as_ref()
+        .and_then(|p| p.transform.as_ref())
+    else {
+        return PictureTransform::default();
+    };
+    PictureTransform {
+        rotation: transform
+            .rotation
+            .map_or(0.0, |r| r.raw() as f32 / 60_000.0),
+        flip_h: transform.flip_h.unwrap_or(false),
+        flip_v: transform.flip_v.unwrap_or(false),
+    }
+}
+
 /// Extract the embedded image relationship ID from a DrawingML Image.
 /// Navigates: Image → graphic → Picture → blip_fill → blip → embed.
 pub fn extract_image_rel_id(image: &Image) -> Option<&RelId> {

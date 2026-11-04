@@ -91,6 +91,7 @@ fn clip_oversized_images(fragments: &[Fragment], max_width: Pt) -> Option<Vec<Fr
                     rel_id,
                     image_data,
                     src_rect,
+                    transform,
                 } if size.width > max_width => {
                     // Fraction of the object's width that survives the clip.
                     let visible = max_width.raw() / size.width.raw();
@@ -114,6 +115,7 @@ fn clip_oversized_images(fragments: &[Fragment], max_width: Pt) -> Option<Vec<Fr
                         rel_id: rel_id.clone(),
                         image_data: image_data.clone(),
                         src_rect: Some(cropped),
+                        transform: *transform,
                     }
                 }
                 other => other.clone(),
@@ -643,6 +645,7 @@ mod tests {
             rel_id: "rId1".to_string(),
             image_data: None,
             src_rect: None,
+            transform: Default::default(),
         }
     }
 

@@ -283,6 +283,7 @@ pub enum Fragment {
         is_footnote_ref: bool,
     },
     Image {
+        transform: crate::render::resolve::images::PictureTransform,
         size: PtSize,
         rel_id: String,
         image_data: Option<MediaEntry>,
@@ -668,6 +669,7 @@ mod mark_line_tests {
             rel_id: "rId1".into(),
             image_data: None,
             src_rect: None,
+            transform: Default::default(),
         }
     }
 

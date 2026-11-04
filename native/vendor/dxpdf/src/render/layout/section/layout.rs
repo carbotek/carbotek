@@ -725,6 +725,7 @@ fn register_paragraph_floats(
         let y_end = y_start + fi.size.height;
         if fi.is_wrap_top_and_bottom() {
             state.current_page.commands.push(DrawCommand::Image {
+                page_anchor: fi.page_anchor,
                 rect: PtRect::from_xywh(
                     fi.x.resolve(parity),
                     y_start,
@@ -733,6 +734,7 @@ fn register_paragraph_floats(
                 ),
                 image_data: fi.image_data.clone(),
                 src_rect: fi.src_rect,
+                transform: fi.transform,
             });
             if y_end > state.cursor_y {
                 state.cursor_y = y_end;
@@ -2358,6 +2360,7 @@ pub(crate) fn layout_section_with_clearance(
                     }
                     let img_y = fi.y.at(parity, para_start_y + effective_style.space_before);
                     state.current_page.commands.push(DrawCommand::Image {
+                        page_anchor: fi.page_anchor,
                         rect: PtRect::from_xywh(
                             fi.x.resolve(parity),
                             img_y,
@@ -2366,6 +2369,7 @@ pub(crate) fn layout_section_with_clearance(
                         ),
                         image_data: fi.image_data.clone(),
                         src_rect: fi.src_rect,
+                        transform: fi.transform,
                     });
                 }
 

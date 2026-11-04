@@ -375,6 +375,7 @@ fn render_header(
     for fi in hf.floating_images.iter().filter(|fi| fi.behind_doc) {
         let img_y = fi.y.at(parity, offset_y);
         header_cmds.push(DrawCommand::Image {
+            page_anchor: fi.page_anchor,
             rect: crate::render::geometry::PtRect::from_xywh(
                 fi.x.resolve(parity),
                 img_y,
@@ -383,6 +384,7 @@ fn render_header(
             ),
             image_data: fi.image_data.clone(),
             src_rect: fi.src_rect,
+            transform: fi.transform,
         });
     }
 
@@ -396,6 +398,7 @@ fn render_header(
     for fi in hf.floating_images.iter().filter(|fi| !fi.behind_doc) {
         let img_y = fi.y.at(parity, offset_y);
         header_cmds.push(DrawCommand::Image {
+            page_anchor: fi.page_anchor,
             rect: crate::render::geometry::PtRect::from_xywh(
                 fi.x.resolve(parity),
                 img_y,
@@ -404,6 +407,7 @@ fn render_header(
             ),
             image_data: fi.image_data.clone(),
             src_rect: fi.src_rect,
+            transform: fi.transform,
         });
     }
     // Paragraph-anchored shapes ride through `result.commands` above (their
@@ -446,6 +450,7 @@ fn render_footer(
     for fi in hf.floating_images.iter().filter(|fi| fi.behind_doc) {
         let img_y = fi.y.at(parity, footer_y);
         page.commands.push(DrawCommand::Image {
+            page_anchor: fi.page_anchor,
             rect: crate::render::geometry::PtRect::from_xywh(
                 fi.x.resolve(parity),
                 img_y,
@@ -454,6 +459,7 @@ fn render_footer(
             ),
             image_data: fi.image_data.clone(),
             src_rect: fi.src_rect,
+            transform: fi.transform,
         });
     }
 
@@ -466,6 +472,7 @@ fn render_footer(
     for fi in hf.floating_images.iter().filter(|fi| !fi.behind_doc) {
         let img_y = fi.y.at(parity, footer_y);
         page.commands.push(DrawCommand::Image {
+            page_anchor: fi.page_anchor,
             rect: crate::render::geometry::PtRect::from_xywh(
                 fi.x.resolve(parity),
                 img_y,
@@ -474,6 +481,7 @@ fn render_footer(
             ),
             image_data: fi.image_data.clone(),
             src_rect: fi.src_rect,
+            transform: fi.transform,
         });
     }
     // Paragraph-anchored shapes ride through `result.commands` above (their

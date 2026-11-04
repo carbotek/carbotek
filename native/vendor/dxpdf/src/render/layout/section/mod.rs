@@ -205,12 +205,14 @@ mod tests {
 
     fn floating_image(wrap_mode: WrapMode, height: f32) -> FloatingImage {
         FloatingImage {
+            page_anchor: Default::default(),
             image_data: MediaEntry {
                 data: std::sync::Arc::from([]),
                 format: crate::model::ImageFormat::Png,
             },
             size: PtSize::new(Pt::new(80.0), Pt::new(height)),
             src_rect: None,
+            transform: Default::default(),
             x: FloatingImageX::Absolute(Pt::new(10.0)),
             y: FloatingImageY::RelativeToParagraph(Pt::ZERO),
             wrap_mode,
@@ -3545,12 +3547,14 @@ mod tests {
             page_break_before: false,
             footnotes: vec![],
             floating_images: vec![FloatingImage {
+                page_anchor: Default::default(),
                 image_data: crate::render::resolve::images::MediaEntry {
                     data: std::sync::Arc::from(&[][..]),
                     format: crate::model::ImageFormat::Png,
                 },
                 size: PtSize::new(Pt::new(fw), Pt::new(fh)),
                 src_rect: None,
+                transform: Default::default(),
                 x: FloatingImageX::Absolute(Pt::new(fx)),
                 y: FloatingImageY::Absolute(Pt::new(fy)),
                 wrap_mode: WrapMode::Square(crate::model::WrapText::BothSides),

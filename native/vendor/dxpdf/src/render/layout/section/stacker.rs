@@ -146,6 +146,7 @@ pub fn stack_blocks(
                             },
                         };
                         commands.push(DrawCommand::Image {
+                            page_anchor: fi.page_anchor,
                             rect: PtRect::from_xywh(
                                 fi.x.resolve(parity),
                                 img_y,
@@ -154,6 +155,7 @@ pub fn stack_blocks(
                             ),
                             image_data: fi.image_data.clone(),
                             src_rect: fi.src_rect,
+                            transform: fi.transform,
                         });
                         let bottom = img_y + fi.size.height;
                         band_bottom = Some(match band_bottom {
@@ -302,6 +304,7 @@ pub fn stack_blocks(
                     }
                     let img_y = fi.y.at(parity, para_content_top);
                     commands.push(DrawCommand::Image {
+                        page_anchor: fi.page_anchor,
                         rect: PtRect::from_xywh(
                             fi.x.resolve(parity),
                             img_y,
@@ -310,6 +313,7 @@ pub fn stack_blocks(
                         ),
                         image_data: fi.image_data.clone(),
                         src_rect: fi.src_rect,
+                        transform: fi.transform,
                     });
                     let img_bottom = img_y + fi.size.height;
                     if !matches!(fi.wrap_mode, super::types::WrapMode::None)
@@ -437,12 +441,14 @@ mod tests {
 
     fn image(height: f32, wrap: WrapMode, y: FloatingImageY) -> FloatingImage {
         FloatingImage {
+            page_anchor: Default::default(),
             image_data: MediaEntry {
                 data: std::sync::Arc::from(&b""[..]),
                 format: ImageFormat::Png,
             },
             size: PtSize::new(Pt::new(50.0), Pt::new(height)),
             src_rect: None,
+            transform: Default::default(),
             x: FloatingImageX::Absolute(Pt::ZERO),
             y,
             wrap_mode: wrap,
