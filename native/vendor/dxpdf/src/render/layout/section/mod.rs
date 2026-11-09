@@ -67,8 +67,8 @@ mod types;
 
 pub use layout::layout_section;
 pub(crate) use layout::layout_section_with_clearance;
-pub(crate) use layout::SectionStart;
 pub(crate) use layout::{FinalPageBounds, LastPageOwner, SectionLayout, SectionTail};
+pub(crate) use layout::{OwnPageBreakSpacing, SectionStart};
 pub use stacker::{stack_blocks, CellLine, StackResult};
 pub use types::*;
 
@@ -381,6 +381,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 2,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1035,6 +1036,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1111,6 +1113,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1188,6 +1191,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1918,6 +1922,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1992,6 +1997,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -2152,12 +2158,133 @@ mod tests {
                 _ => None,
             })
             .expect("heading should be on page 2");
-        // §17.3.1.33: space_before is preserved — pageBreakBefore paragraphs
-        // are not the structural first of the section.
+        // §17.3.1.33: a document that states no compatibility mode keeps the
+        // space before after the paragraph's own pageBreakBefore, as Word's
+        // compatibility modes do.
         assert!(
             heading_y.raw() > config.margins.top.raw() + 20.0,
             "space_before should be preserved for pageBreakBefore: y={}",
             heading_y.raw(),
+        );
+    }
+
+    // ── §17.3.1.33 space_before at a page Word breaks to ────────────────
+
+    /// One 14pt line with `before` above it.
+    fn spaced_para(text: &str, before: f32) -> LayoutBlock {
+        LayoutBlock::Paragraph {
+            fragments: vec![text_frag(text, 30.0, 14.0)],
+            style: ParagraphStyle {
+                space_before: Pt::new(before),
+                ..Default::default()
+            },
+            page_break_before: false,
+            footnotes: vec![],
+            floating_images: vec![],
+            floating_shapes: vec![],
+        }
+    }
+
+    /// Baseline of the text starting with `needle` on `page`.
+    fn baseline(pages: &[crate::render::LayoutedPage], page: usize, needle: &str) -> f32 {
+        pages[page]
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                DrawCommand::Text { position, text, .. } if text.starts_with(needle) => {
+                    Some(position.y.raw())
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{needle} on page {page}"))
+    }
+
+    /// The first line on a page sits at the margin plus its ascent (0.7 x 14).
+    const TOP_BASELINE: f32 = 10.0 + 9.8;
+
+    /// A paragraph that does not fit moves to the next page and loses its
+    /// space before there, as Word drops it after a natural page break.
+    #[test]
+    fn natural_page_flow_drops_the_space_before() {
+        let mut blocks: Vec<LayoutBlock> = (0..5).map(|_| para_block("fill", 30.0)).collect();
+        blocks.push(spaced_para("moved", 24.0));
+        let pages = layout_section(&blocks, &small_config(), None, Pt::ZERO, Pt::new(14.0), None);
+        assert_eq!(pages.len(), 2);
+        assert!((baseline(&pages, 1, "moved") - TOP_BASELINE).abs() < 1e-3);
+    }
+
+    /// The same for a splittable paragraph none of whose lines fit: it moves
+    /// whole, and its first segment starts at the top without space before.
+    #[test]
+    fn a_paragraph_moved_whole_by_the_splitter_drops_the_space_before() {
+        let mut blocks: Vec<LayoutBlock> = (0..4).map(|_| para_block("fill", 30.0)).collect();
+        let LayoutBlock::Paragraph {
+            fragments, style, ..
+        } = multiline_para(3, false, true)
+        else {
+            unreachable!("multiline_para builds a paragraph")
+        };
+        blocks.push(LayoutBlock::Paragraph {
+            fragments,
+            style: ParagraphStyle {
+                space_before: Pt::new(24.0),
+                ..style
+            },
+            page_break_before: false,
+            footnotes: vec![],
+            floating_images: vec![],
+            floating_shapes: vec![],
+        });
+        let pages = layout_section(&blocks, &small_config(), None, Pt::ZERO, Pt::new(14.0), None);
+        assert_eq!(pages.len(), 2, "the 24pt space leaves no room for a line");
+        assert!((baseline(&pages, 1, "word0") - TOP_BASELINE).abs() < 1e-3);
+    }
+
+    /// Word 2013 and later also drop the space before after the paragraph's
+    /// own pageBreakBefore (see the test above for earlier modes).
+    #[test]
+    fn page_break_before_drops_the_space_before_from_word_2013() {
+        let config = small_config();
+        let clearance = HeaderFooterClearance::uniform(&config);
+        let mut heading = spaced_para("heading", 24.0);
+        if let LayoutBlock::Paragraph {
+            page_break_before, ..
+        } = &mut heading
+        {
+            *page_break_before = true;
+        }
+        let pages = layout_section_with_clearance(
+            &[para_block("first page", 30.0), heading],
+            &config,
+            None,
+            Pt::ZERO,
+            Pt::new(14.0),
+            super::layout::SectionStart {
+                continuation: None,
+                clearance: &clearance,
+                last_page: super::layout::LastPageOwner::Own,
+                logical_page_base: 1,
+                own_page_break_spacing: OwnPageBreakSpacing::Drop,
+            },
+        )
+        .pages;
+        assert_eq!(pages.len(), 2);
+        assert!((baseline(&pages, 1, "heading") - TOP_BASELINE).abs() < 1e-3);
+    }
+
+    #[test]
+    fn compatibility_mode_15_and_later_drop_the_space_after_an_own_break() {
+        assert_eq!(
+            OwnPageBreakSpacing::for_compatibility_mode(None),
+            OwnPageBreakSpacing::Keep
+        );
+        assert_eq!(
+            OwnPageBreakSpacing::for_compatibility_mode(Some(14)),
+            OwnPageBreakSpacing::Keep
+        );
+        assert_eq!(
+            OwnPageBreakSpacing::for_compatibility_mode(Some(15)),
+            OwnPageBreakSpacing::Drop
         );
     }
 

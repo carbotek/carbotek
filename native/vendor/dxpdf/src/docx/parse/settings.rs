@@ -24,7 +24,29 @@ struct SettingsXml {
     even_and_odd_headers: Vec<OnOff>,
     #[serde(default)]
     rsids: Vec<RsidsXml>,
+    #[serde(default)]
+    compat: Vec<CompatXml>,
 }
+
+#[derive(Deserialize, Default)]
+struct CompatXml {
+    #[serde(rename = "compatSetting", default)]
+    settings: Vec<CompatSettingXml>,
+}
+
+/// `<w:compatSetting w:name="…" w:uri="…" w:val="…"/>`: a name/value pair in a namespace given by
+/// `@uri`. Only Word's own namespace defines `compatibilityMode`.
+#[derive(Deserialize)]
+struct CompatSettingXml {
+    #[serde(rename = "@name", default)]
+    name: String,
+    #[serde(rename = "@uri", default)]
+    uri: String,
+    #[serde(rename = "@val", default)]
+    val: String,
+}
+
+const WORD_COMPAT_URI: &str = "http://schemas.microsoft.com/office/word";
 
 #[derive(Deserialize, Default)]
 struct RsidsXml {
@@ -69,6 +91,49 @@ impl From<SettingsXml> for DocumentSettings {
                 .filter_map(|v| RevisionSaveId::from_hex(&v.val))
                 .collect();
         }
+        if let Some(compat) = Dup::from(x.compat).into_value() {
+            s.compatibility_mode = compat
+                .settings
+                .iter()
+                .rev()
+                .find(|c| c.name == "compatibilityMode" && c.uri == WORD_COMPAT_URI)
+                .and_then(|c| c.val.trim().parse().ok());
+        }
         s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings(compat: &str) -> DocumentSettings {
+        parse_settings(
+            format!(
+                r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{compat}</w:settings>"#
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn compatibility_mode_is_read_from_words_namespace() {
+        let s = settings(
+            r#"<w:compat><w:useFELayout/><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat>"#,
+        );
+        assert_eq!(s.compatibility_mode, Some(15));
+    }
+
+    #[test]
+    fn compatibility_mode_is_absent_without_words_setting() {
+        assert_eq!(settings("").compatibility_mode, None);
+        let foreign = settings(
+            r#"<w:compat><w:compatSetting w:name="compatibilityMode" w:uri="urn:other" w:val="15"/></w:compat>"#,
+        );
+        assert_eq!(
+            foreign.compatibility_mode, None,
+            "another namespace's setting"
+        );
     }
 }

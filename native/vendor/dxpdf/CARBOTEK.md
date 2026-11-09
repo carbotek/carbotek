@@ -80,13 +80,24 @@ Floating pictures without text wrapping (`wrapNone`), for example a signature dr
 9. The first paragraph of the document, and of a section that starts on a new page, keeps its space
    before at the page top (`section/layout.rs`). Upstream zeroed it through a `first_on_section_page`
    flag, which is removed; Word 2013+ and Word's compatibility modes both apply that space.
+10. At the top of a page or column that the text flowed to or that a page break led to, a paragraph
+   loses its space before, as in Word: natural page and column flow, keep-with-next moves, a
+   paragraph moved whole by the splitter, a page break ending the previous paragraph or forming a
+   paragraph of its own. `PageLayoutState::top_drops_space_before` is set by `push_new_page` and
+   `advance_to_next_column` and cleared by an explicit column break, which keeps the space. Text after
+   a page break inside a paragraph continues it without space before. A paragraph's own
+   `pageBreakBefore`, or a page break at its start, drops the space from `compatibilityMode` 15 on
+   and keeps it in earlier modes (`OwnPageBreakSpacing`, from `w:compat/w:compatSetting` parsed in
+   `docx/parse/settings.rs`). The keep-with-next fit on a fresh page subtracts the whole space before
+   of the group's first paragraph (upstream subtracted only a contextual one).
 
 Tests: unit tests in `section/stacker.rs` and `section/mod.rs` (§20.4.3.5 sections,
-`space_before_applies_to_the_first_paragraph_of_a_section`),
+`space_before_applies_to_the_first_paragraph_of_a_section` and the "space_before at a page Word
+breaks to" section), `docx/parse/settings.rs`,
 `build/table.rs` (`an_explicit_zero_table_cell_margin_overrides_the_style`), `resolve/properties.rs`
 (`table_cell_margins_*`) and `model/geometry.rs`; end to end in
 `tests/regression/test_pdf_paragraph_anchors.py`, `tests/regression/test_pdf_table_cell_margins.py` and
-`tests/regression/test_pdf_section_start_spacing.py`.
+`tests/regression/test_pdf_page_top_spacing.py`.
 The Python checks compare synthetic documents that differ only in spacing or margins, so they hold
 with any installed font; each was also evaluated on Word's own PDF export of the same documents.
 

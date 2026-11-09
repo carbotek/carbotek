@@ -14,6 +14,10 @@ pub struct DocumentSettings {
     pub rsid_root: Option<RevisionSaveId>,
     /// All revision save IDs recorded in this document's history.
     pub rsids: Vec<RevisionSaveId>,
+    /// §17.15.3 `w:compat/w:compatSetting` `compatibilityMode` in Word's own namespace: the Word
+    /// version whose layout the document asks for — 15 for Word 2013 and later. `None` when the
+    /// document states none, which Word opens in a compatibility mode for earlier versions.
+    pub compatibility_mode: Option<u32>,
 }
 
 impl Default for DocumentSettings {
@@ -27,6 +31,7 @@ impl Default for DocumentSettings {
             even_and_odd_headers: false,
             rsid_root: None,
             rsids: Vec::new(),
+            compatibility_mode: None,
         }
     }
 }
@@ -49,5 +54,6 @@ mod tests {
         assert!(!s.even_and_odd_headers);
         assert!(s.rsid_root.is_none());
         assert!(s.rsids.is_empty());
+        assert!(s.compatibility_mode.is_none());
     }
 }
