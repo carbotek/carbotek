@@ -90,14 +90,16 @@ impl<U: Unit> EdgeInsets<U> {
     }
 }
 
-/// Edge insets where each side may be unspecified — used for cell-level
-/// overrides (`<w:tcMar>`) that cascade against a parent default. Per
-/// OOXML §17.4.42, an explicit `<w:tcMar>` with only some sides present
-/// inherits the remaining sides from the table-level `<w:tblCellMar>`;
-/// `unwrap_or_default()` per side would incorrectly zero out the inherited
-/// values (visible as missing left/right padding inside a cell whose
-/// `tcMar` set only `top` and `bottom`). `resolve_against` performs the
-/// per-side fallback.
+/// Edge insets where each side may be unspecified — used for cell margins,
+/// which cascade side by side. A `<w:tcMar>` (§17.4.68) with only some sides
+/// inherits the rest from the table default; a table's `<w:tblCellMar>`
+/// (§17.4.42) does the same against its style, and a style against its
+/// `basedOn` parent. An absent side is not a zero: `<w:left w:w="0"/>` states
+/// a zero that overrides a parent's non-zero left. `unwrap_or_default()` per
+/// side would erase that distinction (visible as missing padding inside a
+/// cell whose `tcMar` set only `top` and `bottom`, or as a style's padding a
+/// table's explicit zero failed to remove). [`Self::or`] and
+/// [`Self::resolve_against`] perform the per-side fallback.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PartialEdgeInsets<U: Unit> {
     pub top: Option<Dimension<U>>,
@@ -118,6 +120,17 @@ impl<U: Unit> PartialEdgeInsets<U> {
             right,
             bottom,
             left,
+        }
+    }
+
+    /// Take each side this level states, and the remaining ones from
+    /// `fallback`, which may leave some unstated in turn.
+    pub fn or(self, fallback: Self) -> Self {
+        Self {
+            top: self.top.or(fallback.top),
+            right: self.right.or(fallback.right),
+            bottom: self.bottom.or(fallback.bottom),
+            left: self.left.or(fallback.left),
         }
     }
 
@@ -152,6 +165,17 @@ mod tests {
         assert_eq!(resolved.right, tw(100)); // inherited
         assert_eq!(resolved.bottom, tw(7));
         assert_eq!(resolved.left, tw(100)); // inherited
+    }
+
+    #[test]
+    fn partial_insets_layer_per_side_and_keep_explicit_zero() {
+        let parent = PartialEdgeInsets::new(Some(tw(0)), Some(tw(108)), None, Some(tw(108)));
+        let child = PartialEdgeInsets::new(None, None, Some(tw(5)), Some(tw(0)));
+        assert_eq!(
+            child.or(parent),
+            PartialEdgeInsets::new(Some(tw(0)), Some(tw(108)), Some(tw(5)), Some(tw(0))),
+            "a stated zero wins over the parent's 108; unstated sides come from the parent"
+        );
     }
 
     #[test]

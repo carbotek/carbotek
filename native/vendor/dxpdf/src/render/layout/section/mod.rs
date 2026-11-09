@@ -67,8 +67,8 @@ mod types;
 
 pub use layout::layout_section;
 pub(crate) use layout::layout_section_with_clearance;
-pub(crate) use layout::SectionStart;
 pub(crate) use layout::{FinalPageBounds, LastPageOwner, SectionLayout, SectionTail};
+pub(crate) use layout::{OwnPageBreakSpacing, SectionStart};
 pub use stacker::{stack_blocks, CellLine, StackResult};
 pub use types::*;
 
@@ -381,6 +381,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 2,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1035,6 +1036,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1111,6 +1113,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1188,6 +1191,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1918,6 +1922,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -1992,6 +1997,7 @@ mod tests {
                 last_page: super::layout::LastPageOwner::Own,
                 clearance: &clearance,
                 logical_page_base: 1,
+                own_page_break_spacing: Default::default(),
             },
         )
         .pages;
@@ -2088,10 +2094,12 @@ mod tests {
         assert_eq!(text_count, 1);
     }
 
-    // ── §17.3.1.33 space_before suppression tests ──────────────────────
+    // ── §17.3.1.33 space_before at the page top ─────────────────────────
 
+    /// §17.3.1.33: Word keeps the space before of the first paragraph of the
+    /// document, and of a section starting on a new page, at the page top.
     #[test]
-    fn space_before_suppressed_for_first_paragraph_of_section() {
+    fn space_before_applies_to_the_first_paragraph_of_a_section() {
         let style = ParagraphStyle {
             space_before: Pt::new(24.0),
             ..Default::default()
@@ -2107,14 +2115,15 @@ mod tests {
         let config = small_config();
         let pages = layout_section(&blocks, &config, None, Pt::ZERO, Pt::new(14.0), None);
 
-        // First paragraph on the section's initial page: space_before suppressed.
-        if let Some(DrawCommand::Text { position, .. }) = pages[0].commands.first() {
-            assert!(
-                position.y.raw() < config.margins.top.raw() + 24.0,
-                "space_before should be suppressed: y={}",
-                position.y.raw()
-            );
-        }
+        let Some(DrawCommand::Text { position, .. }) = pages[0].commands.first() else {
+            panic!("the heading is the first command");
+        };
+        let expected = config.margins.top.raw() + 24.0 + 14.0 * 0.7;
+        assert!(
+            (position.y.raw() - expected).abs() < 1e-3,
+            "baseline 24pt below the margin, then the ascent: y={}",
+            position.y.raw()
+        );
     }
 
     #[test]
@@ -2149,12 +2158,133 @@ mod tests {
                 _ => None,
             })
             .expect("heading should be on page 2");
-        // §17.3.1.33: space_before is preserved — pageBreakBefore paragraphs
-        // are not the structural first of the section.
+        // §17.3.1.33: a document that states no compatibility mode keeps the
+        // space before after the paragraph's own pageBreakBefore, as Word's
+        // compatibility modes do.
         assert!(
             heading_y.raw() > config.margins.top.raw() + 20.0,
             "space_before should be preserved for pageBreakBefore: y={}",
             heading_y.raw(),
+        );
+    }
+
+    // ── §17.3.1.33 space_before at a page Word breaks to ────────────────
+
+    /// One 14pt line with `before` above it.
+    fn spaced_para(text: &str, before: f32) -> LayoutBlock {
+        LayoutBlock::Paragraph {
+            fragments: vec![text_frag(text, 30.0, 14.0)],
+            style: ParagraphStyle {
+                space_before: Pt::new(before),
+                ..Default::default()
+            },
+            page_break_before: false,
+            footnotes: vec![],
+            floating_images: vec![],
+            floating_shapes: vec![],
+        }
+    }
+
+    /// Baseline of the text starting with `needle` on `page`.
+    fn baseline(pages: &[crate::render::LayoutedPage], page: usize, needle: &str) -> f32 {
+        pages[page]
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                DrawCommand::Text { position, text, .. } if text.starts_with(needle) => {
+                    Some(position.y.raw())
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{needle} on page {page}"))
+    }
+
+    /// The first line on a page sits at the margin plus its ascent (0.7 x 14).
+    const TOP_BASELINE: f32 = 10.0 + 9.8;
+
+    /// A paragraph that does not fit moves to the next page and loses its
+    /// space before there, as Word drops it after a natural page break.
+    #[test]
+    fn natural_page_flow_drops_the_space_before() {
+        let mut blocks: Vec<LayoutBlock> = (0..5).map(|_| para_block("fill", 30.0)).collect();
+        blocks.push(spaced_para("moved", 24.0));
+        let pages = layout_section(&blocks, &small_config(), None, Pt::ZERO, Pt::new(14.0), None);
+        assert_eq!(pages.len(), 2);
+        assert!((baseline(&pages, 1, "moved") - TOP_BASELINE).abs() < 1e-3);
+    }
+
+    /// The same for a splittable paragraph none of whose lines fit: it moves
+    /// whole, and its first segment starts at the top without space before.
+    #[test]
+    fn a_paragraph_moved_whole_by_the_splitter_drops_the_space_before() {
+        let mut blocks: Vec<LayoutBlock> = (0..4).map(|_| para_block("fill", 30.0)).collect();
+        let LayoutBlock::Paragraph {
+            fragments, style, ..
+        } = multiline_para(3, false, true)
+        else {
+            unreachable!("multiline_para builds a paragraph")
+        };
+        blocks.push(LayoutBlock::Paragraph {
+            fragments,
+            style: ParagraphStyle {
+                space_before: Pt::new(24.0),
+                ..style
+            },
+            page_break_before: false,
+            footnotes: vec![],
+            floating_images: vec![],
+            floating_shapes: vec![],
+        });
+        let pages = layout_section(&blocks, &small_config(), None, Pt::ZERO, Pt::new(14.0), None);
+        assert_eq!(pages.len(), 2, "the 24pt space leaves no room for a line");
+        assert!((baseline(&pages, 1, "word0") - TOP_BASELINE).abs() < 1e-3);
+    }
+
+    /// Word 2013 and later also drop the space before after the paragraph's
+    /// own pageBreakBefore (see the test above for earlier modes).
+    #[test]
+    fn page_break_before_drops_the_space_before_from_word_2013() {
+        let config = small_config();
+        let clearance = HeaderFooterClearance::uniform(&config);
+        let mut heading = spaced_para("heading", 24.0);
+        if let LayoutBlock::Paragraph {
+            page_break_before, ..
+        } = &mut heading
+        {
+            *page_break_before = true;
+        }
+        let pages = layout_section_with_clearance(
+            &[para_block("first page", 30.0), heading],
+            &config,
+            None,
+            Pt::ZERO,
+            Pt::new(14.0),
+            super::layout::SectionStart {
+                continuation: None,
+                clearance: &clearance,
+                last_page: super::layout::LastPageOwner::Own,
+                logical_page_base: 1,
+                own_page_break_spacing: OwnPageBreakSpacing::Drop,
+            },
+        )
+        .pages;
+        assert_eq!(pages.len(), 2);
+        assert!((baseline(&pages, 1, "heading") - TOP_BASELINE).abs() < 1e-3);
+    }
+
+    #[test]
+    fn compatibility_mode_15_and_later_drop_the_space_after_an_own_break() {
+        assert_eq!(
+            OwnPageBreakSpacing::for_compatibility_mode(None),
+            OwnPageBreakSpacing::Keep
+        );
+        assert_eq!(
+            OwnPageBreakSpacing::for_compatibility_mode(Some(14)),
+            OwnPageBreakSpacing::Keep
+        );
+        assert_eq!(
+            OwnPageBreakSpacing::for_compatibility_mode(Some(15)),
+            OwnPageBreakSpacing::Drop
         );
     }
 
@@ -3707,6 +3837,115 @@ mod tests {
             in_col0 + in_col1,
             8,
             "all words land in one column or the other"
+        );
+    }
+
+    // ── §20.4.3.5 paragraph-relative origin in the body ──────────────────
+
+    /// A 200x400 page with 10pt margins: room for a few paragraphs and a band.
+    fn anchor_page_config() -> PageConfig {
+        PageConfig {
+            page_size: PtSize::new(Pt::new(200.0), Pt::new(400.0)),
+            ..small_config()
+        }
+    }
+
+    /// "top" (one 14pt line, `after` below it), then "anchor" with `before`
+    /// and the given float.
+    fn anchor_after_top(after: f32, before: f32, float: FloatingImage) -> Vec<LayoutBlock> {
+        let paragraph =
+            |text: &str, space_before: f32, space_after: f32, floats| LayoutBlock::Paragraph {
+                fragments: vec![text_frag(text, 30.0, 14.0)],
+                style: ParagraphStyle {
+                    space_before: Pt::new(space_before),
+                    space_after: Pt::new(space_after),
+                    ..Default::default()
+                },
+                page_break_before: false,
+                footnotes: vec![],
+                floating_images: floats,
+                floating_shapes: vec![],
+            };
+        vec![
+            paragraph("top", 0.0, after, vec![]),
+            paragraph("anchor", before, 0.0, vec![float]),
+        ]
+    }
+
+    /// (image y, "anchor" text y) on the single page.
+    fn anchor_geometry(blocks: &[LayoutBlock]) -> (f32, f32) {
+        let pages = layout_section(
+            blocks,
+            &anchor_page_config(),
+            None,
+            Pt::ZERO,
+            Pt::new(14.0),
+            None,
+        );
+        assert_eq!(pages.len(), 1);
+        let image = pages[0]
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                DrawCommand::Image { rect, .. } => Some(rect.origin.y.raw()),
+                _ => None,
+            })
+            .expect("the anchored image");
+        let text = pages[0]
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                DrawCommand::Text { text, position, .. } if text.as_ref() == "anchor" => {
+                    Some(position.y.raw())
+                }
+                _ => None,
+            })
+            .expect("the anchor paragraph's text");
+        (image, text)
+    }
+
+    /// The edge sits below "top" (10 + 14); the 20pt space before lies between
+    /// the picture's origin and the text, whose baseline is 0.7 * 14 lower.
+    #[test]
+    fn body_paragraph_anchor_is_measured_from_above_the_space_before() {
+        let blocks = anchor_after_top(0.0, 20.0, floating_image(WrapMode::None, 10.0));
+        let (image, text) = anchor_geometry(&blocks);
+        assert!(
+            (image - 24.0).abs() < 1e-3,
+            "image at the top edge, got {image}"
+        );
+        assert!(
+            (text - (24.0 + 20.0 + 9.8)).abs() < 1e-3,
+            "text 20pt lower, got {text}"
+        );
+    }
+
+    /// A 24pt space after above absorbs the 12pt space before: the edge is the
+    /// text top.
+    #[test]
+    fn body_space_after_above_absorbs_the_space_before() {
+        let blocks = anchor_after_top(24.0, 12.0, floating_image(WrapMode::None, 10.0));
+        let (image, text) = anchor_geometry(&blocks);
+        assert!(
+            (image - 48.0).abs() < 1e-3,
+            "image at the text top, got {image}"
+        );
+        assert!((text - (48.0 + 9.8)).abs() < 1e-3, "got {text}");
+    }
+
+    /// §20.4.2.18: the band starts at the edge and pushes the paragraph, whose
+    /// text keeps its 20pt space before below the 30pt band.
+    #[test]
+    fn body_top_and_bottom_band_pushes_the_paragraph_from_its_top_edge() {
+        let blocks = anchor_after_top(0.0, 20.0, floating_image(WrapMode::TopAndBottom, 30.0));
+        let (image, text) = anchor_geometry(&blocks);
+        assert!(
+            (image - 24.0).abs() < 1e-3,
+            "band at the top edge, got {image}"
+        );
+        assert!(
+            (text - (24.0 + 30.0 + 20.0 + 9.8)).abs() < 1e-3,
+            "text below the band plus its space before, got {text}"
         );
     }
 }

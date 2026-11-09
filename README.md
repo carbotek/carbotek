@@ -144,6 +144,8 @@ The bundled PDF engine applies picture rotation and flips about the frame's cent
 It preserves per-picture transforms even when pictures share one media file. Non-wrapping pictures
 in table cells support page/margin references independently on each axis, including repeated table
 headers and mirrored logical page numbering. Paragraph and column references stay local to the cell.
+As in Word, a paragraph-relative position is measured from the paragraph's top edge, above its space
+before, and table cell margins combine per side, so a table's zero margin overrides its style's.
 
 ### Images from URLs and files
 

@@ -253,6 +253,10 @@ fn shared_page_owner_bounds(
                     // computed is what will replace them.
                     last_page: layout::section::LastPageOwner::SharedWithNext { bounds: None },
                     logical_page_base: base,
+                    own_page_break_spacing:
+                        layout::section::OwnPageBreakSpacing::for_compatibility_mode(
+                            ctx.resolved.compatibility_mode,
+                        ),
                 },
             );
             (!laid.pages.is_empty(), laid.tail)
@@ -547,6 +551,9 @@ pub fn layout_document(
             }
         };
 
+        let own_page_break_spacing = layout::section::OwnPageBreakSpacing::for_compatibility_mode(
+            resolved.compatibility_mode,
+        );
         let lay_out = |continuation: Option<layout::section::ContinuationState>,
                        bounds: Option<layout::section::FinalPageBounds>| {
             layout_section_with_clearance(
@@ -560,6 +567,7 @@ pub fn layout_document(
                     clearance: &clearance,
                     last_page: owner(bounds),
                     logical_page_base,
+                    own_page_break_spacing,
                 },
             )
         };

@@ -167,6 +167,13 @@ pub fn merge_table_properties(
     // is the same rule with nothing on the left of it — hence one path, so the
     // two cases cannot drift apart.
     let t = target.get_or_insert_with(TableProperties::default);
+    // §17.4.42: each side of `<w:tblCellMar>` is its own property, so a child
+    // stating only `left` keeps the parent's other three sides.
+    match (t.cell_margins.get_mut(), b.cell_margins.get()) {
+        (Some(tm), Some(bm)) => *tm = tm.or(*bm),
+        (None, Some(_)) => t.cell_margins = b.cell_margins.clone(),
+        _ => {}
+    }
     merge_fields!(
         t,
         b,
@@ -175,7 +182,6 @@ pub fn merge_table_properties(
         layout,
         indent,
         borders,
-        cell_margins,
         cell_spacing,
         look,
         style_row_band_size,
@@ -312,7 +318,13 @@ pub fn overlay_table_properties(
     take(&mut out.layout, overlay.layout.clone());
     take(&mut out.indent, overlay.indent.clone());
     take(&mut out.borders, overlay.borders.clone());
-    take(&mut out.cell_margins, overlay.cell_margins.clone());
+    // §17.4.42: per side, like the inheritance above — the sides the overlay
+    // states win, the others fall through.
+    match (out.cell_margins.get_mut(), overlay.cell_margins.get()) {
+        (Some(om), Some(over)) => *om = over.or(*om),
+        (None, Some(_)) => out.cell_margins = overlay.cell_margins.clone(),
+        _ => {}
+    }
     take(&mut out.cell_spacing, overlay.cell_spacing.clone());
     take(&mut out.look, overlay.look.clone());
     take(
@@ -849,7 +861,7 @@ mod tests {
     /// overlay coverage tests below — one place to add a new field to, which is
     /// what makes forgetting one a failure in both directions.
     fn every_table_property() -> TableProperties {
-        use crate::model::geometry::EdgeInsets;
+        use crate::model::geometry::PartialEdgeInsets;
         TableProperties {
             style_id: Some(StyleId::new("Ignored")),
             alignment: Dup::from(Some(Alignment::Center)),
@@ -864,12 +876,12 @@ mod tests {
                 inside_h: None,
                 inside_v: None,
             })),
-            cell_margins: Dup::from(Some(EdgeInsets {
-                top: Dimension::new(1),
-                right: Dimension::new(2),
-                bottom: Dimension::new(3),
-                left: Dimension::new(4),
-            })),
+            cell_margins: Dup::from(Some(PartialEdgeInsets::new(
+                Some(Dimension::new(1)),
+                Some(Dimension::new(2)),
+                Some(Dimension::new(3)),
+                Some(Dimension::new(4)),
+            ))),
             cell_spacing: Dup::from(Some(TableMeasure::Twips(Dimension::new(30)))),
             look: Dup::from(Some(TableLook {
                 first_row: Some(true),
@@ -1238,15 +1250,11 @@ mod tests {
     /// what the overlay specifies wins, and what it omits falls through.
     #[test]
     fn table_properties_overlay_wins_but_only_where_specified() {
-        use crate::model::geometry::EdgeInsets;
+        use crate::model::geometry::PartialEdgeInsets;
+        let nine = Some(Dimension::new(9));
         let base = TableProperties {
             alignment: Dup::from(Some(Alignment::Start)),
-            cell_margins: Dup::from(Some(EdgeInsets {
-                top: Dimension::new(9),
-                right: Dimension::new(9),
-                bottom: Dimension::new(9),
-                left: Dimension::new(9),
-            })),
+            cell_margins: Dup::from(Some(PartialEdgeInsets::new(nine, nine, nine, nine))),
             ..Default::default()
         };
         let overlay = TableProperties {
@@ -1262,6 +1270,63 @@ mod tests {
         assert_eq!(
             out.cell_margins, base.cell_margins,
             "what the overlay omits falls through to the base"
+        );
+    }
+    /// §17.4.42 / §17.7.4.3: `<w:tblCellMar>` inherits side by side. A child
+    /// style that states only a zero `left` keeps its parent's right margin,
+    /// and the stated zero is not mistaken for an absent side.
+    #[test]
+    fn table_cell_margins_inherit_per_side() {
+        use crate::model::geometry::PartialEdgeInsets;
+        let side = |twips: i64| Some(Dimension::new(twips));
+        let base = Some(TableProperties {
+            cell_margins: Dup::from(Some(PartialEdgeInsets::new(
+                side(0),
+                side(108),
+                side(0),
+                side(108),
+            ))),
+            ..Default::default()
+        });
+        let mut target = Some(TableProperties {
+            cell_margins: Dup::from(Some(PartialEdgeInsets::new(None, None, None, side(0)))),
+            ..Default::default()
+        });
+        merge_table_properties(&mut target, &base);
+        assert_eq!(
+            target.unwrap().cell_margins.cloned(),
+            Some(PartialEdgeInsets::new(side(0), side(108), side(0), side(0)))
+        );
+    }
+
+    /// The `wholeTable` overlay layers per side too: what it states wins,
+    /// the remaining sides stay the style's.
+    #[test]
+    fn table_cell_margins_overlay_per_side() {
+        use crate::model::geometry::PartialEdgeInsets;
+        let side = |twips: i64| Some(Dimension::new(twips));
+        let base = TableProperties {
+            cell_margins: Dup::from(Some(PartialEdgeInsets::new(
+                side(0),
+                side(108),
+                side(0),
+                side(108),
+            ))),
+            ..Default::default()
+        };
+        let overlay = TableProperties {
+            cell_margins: Dup::from(Some(PartialEdgeInsets::new(side(40), None, None, None))),
+            ..Default::default()
+        };
+        let out = overlay_table_properties(Some(base), &overlay);
+        assert_eq!(
+            out.cell_margins.cloned(),
+            Some(PartialEdgeInsets::new(
+                side(40),
+                side(108),
+                side(0),
+                side(108)
+            ))
         );
     }
 }

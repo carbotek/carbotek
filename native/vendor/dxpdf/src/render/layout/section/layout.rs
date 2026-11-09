@@ -21,8 +21,8 @@ use super::helpers::{
     render_page_footnotes, split_at_column_breaks, split_at_page_breaks, table_x_offset,
 };
 use super::types::{
-    ContinuationState, FloatingImage, FloatingImageY, FloatingShape, LayoutBlock, PageParity,
-    WrapMode,
+    paragraph_top_edge, top_and_bottom_push, ContinuationState, FloatingImage, FloatingImageY,
+    FloatingShape, LayoutBlock, PageParity, WrapMode,
 };
 use super::FLOAT_DEDUP_EPSILON_PT;
 use super::FOOTNOTE_SEPARATOR_GAP;
@@ -38,6 +38,7 @@ struct LayoutCtx<'cx> {
     config: &'cx PageConfig,
     clearance: &'cx HeaderFooterClearance,
     last_page: LastPageOwner,
+    own_page_break_spacing: OwnPageBreakSpacing,
     measure_text: super::super::paragraph::MeasureTextFn<'cx>,
     separator_indent: Pt,
     default_line_height: Pt,
@@ -102,8 +103,11 @@ struct PageLayoutState<'doc> {
         &'doc [super::super::fragment::Fragment],
         &'doc ParagraphStyle,
     )>,
-    /// §17.3.1.33: true until the structural first content block is placed.
-    first_on_section_page: bool,
+    /// §17.3.1.33: the current page or column was reached by flow or by a page
+    /// break, so a paragraph at its top loses its space before (Word). False on
+    /// a section's first page and after an explicit column break, where Word
+    /// keeps it.
+    top_drops_space_before: bool,
     /// §17.3.1.9: space_after of the previous paragraph for spacing collapse.
     prev_space_after: Pt,
     /// §17.3.1.9: style_id of the previous paragraph for contextual spacing.
@@ -178,9 +182,7 @@ impl<'doc> PageLayoutState<'doc> {
                 bottom: c.bottom,
                 page_footnotes: Vec::new(),
                 carried_footnotes: c.page_footnotes,
-                // §17.3.1.33: the page top is above the preceding section's
-                // content, not here — space_before must not be suppressed.
-                first_on_section_page: false,
+                top_drops_space_before: false,
                 prev_space_after: c.prev_space_after,
                 prev_style_id: c.prev_style_id,
                 prev_borders: c.prev_borders,
@@ -206,7 +208,7 @@ impl<'doc> PageLayoutState<'doc> {
                 bottom: bounds.bottom,
                 page_footnotes: Vec::new(),
                 carried_footnotes: Vec::new(),
-                first_on_section_page: true,
+                top_drops_space_before: false,
                 prev_space_after: Pt::ZERO,
                 prev_style_id: None,
                 prev_borders: None,
@@ -253,10 +255,13 @@ impl<'doc> PageLayoutState<'doc> {
     /// forgets it here.
     ///
     /// [`finalize`]: PageLayoutState::finalize
+    /// Move to the next column by flow. An explicit column break resets
+    /// [`Self::top_drops_space_before`] afterwards.
     fn advance_to_next_column(&mut self) {
         self.deepest_column_bottom = self.deepest_column_bottom.max(self.cursor_y);
         self.current_col += 1;
         self.cursor_y = self.column_top;
+        self.top_drops_space_before = true;
     }
 
     /// Render accumulated footnotes onto the current page and clear the list.
@@ -311,6 +316,8 @@ impl<'doc> PageLayoutState<'doc> {
         self.cursor_y = bounds.top;
         self.column_top = bounds.top;
         self.current_col = 0;
+        // §17.3.1.33: within a section, every new page follows a break.
+        self.top_drops_space_before = true;
         // §17.6.22: whatever page we came from, this one starts at its own top,
         // so the inherited short column set is behind us.
         self.inherited_short_columns = false;
@@ -528,7 +535,7 @@ struct PageReplayCheckpoint<'doc> {
         &'doc [super::super::fragment::Fragment],
         &'doc ParagraphStyle,
     )>,
-    first_on_section_page: bool,
+    top_drops_space_before: bool,
     prev_space_after: Pt,
     prev_style_id: Option<StyleId>,
     prev_borders: Option<ParagraphBorderStyle>,
@@ -554,7 +561,7 @@ impl<'doc> PageReplayCheckpoint<'doc> {
             deepest_column_bottom: state.deepest_column_bottom,
             bottom: state.bottom,
             page_footnotes: state.page_footnotes.clone(),
-            first_on_section_page: state.first_on_section_page,
+            top_drops_space_before: state.top_drops_space_before,
             prev_space_after: state.prev_space_after,
             prev_style_id: state.prev_style_id.clone(),
             prev_borders: state.prev_borders.clone(),
@@ -579,7 +586,7 @@ impl<'doc> PageReplayCheckpoint<'doc> {
         state.deepest_column_bottom = self.deepest_column_bottom;
         state.bottom = self.bottom;
         state.page_footnotes.clone_from(&self.page_footnotes);
-        state.first_on_section_page = self.first_on_section_page;
+        state.top_drops_space_before = self.top_drops_space_before;
         state.prev_space_after = self.prev_space_after;
         state.prev_style_id.clone_from(&self.prev_style_id);
         state.prev_borders.clone_from(&self.prev_borders);
@@ -713,15 +720,19 @@ fn emit_shape_text(state: &mut PageLayoutState<'_>, fs: &FloatingShape, shape_y:
     }
 }
 
+/// Register a paragraph's floats against its top edge (`paragraph_top`,
+/// [`paragraph_top_edge`]). `wrapTopAndBottom` objects are drawn now and push
+/// the cursor, and with it the whole paragraph, below their band.
 fn register_paragraph_floats(
     state: &mut PageLayoutState<'_>,
     floating_images: &[FloatingImage],
     floating_shapes: &[FloatingShape],
-    content_top: Pt,
+    paragraph_top: Pt,
 ) {
     let parity = state.parity();
+    let mut band_bottom: Option<Pt> = None;
     for fi in floating_images {
-        let y_start = fi.y.at(parity, content_top);
+        let y_start = fi.y.at(parity, paragraph_top);
         let y_end = y_start + fi.size.height;
         if fi.is_wrap_top_and_bottom() {
             state.current_page.commands.push(DrawCommand::Image {
@@ -736,9 +747,7 @@ fn register_paragraph_floats(
                 src_rect: fi.src_rect,
                 transform: fi.transform,
             });
-            if y_end > state.cursor_y {
-                state.cursor_y = y_end;
-            }
+            band_bottom = Some(band_bottom.map_or(y_end, |bottom| bottom.max(y_end)));
         } else if fi.wrap_mode.registers_as_wrap_float() {
             let float_entry = float::ActiveFloat {
                 page_x: fi.x.resolve(parity) - fi.dist_left,
@@ -763,7 +772,7 @@ fn register_paragraph_floats(
         if matches!(fs.wrap_mode, WrapMode::None) {
             continue;
         }
-        let y_start = fs.y.at(parity, content_top);
+        let y_start = fs.y.at(parity, paragraph_top);
         let y_end = y_start + fs.size.height;
         if fs.is_wrap_top_and_bottom() {
             let shape_y = y_start;
@@ -779,9 +788,7 @@ fn register_paragraph_floats(
                 effects: fs.effects.clone(),
             });
             emit_shape_text(state, fs, shape_y);
-            if y_end > state.cursor_y {
-                state.cursor_y = y_end;
-            }
+            band_bottom = Some(band_bottom.map_or(y_end, |bottom| bottom.max(y_end)));
         } else {
             let float_entry = float::ActiveFloat {
                 page_x: fs.x.resolve(parity) - fs.dist_left,
@@ -802,17 +809,24 @@ fn register_paragraph_floats(
             state.page_floats.push(float_entry);
         }
     }
+
+    // §20.4.2.18: the band pushes the whole paragraph down, so the text keeps
+    // its own space before below the band.
+    if let Some(bottom) = band_bottom {
+        state.cursor_y += top_and_bottom_push(paragraph_top, bottom);
+    }
 }
 
+/// Register a paragraph's floats after it moved to a fresh page or column,
+/// whose cursor is the paragraph's top edge.
 fn register_destination_paragraph_floats(
     state: &mut PageLayoutState<'_>,
     floating_images: &[FloatingImage],
     floating_shapes: &[FloatingShape],
-    space_before: Pt,
     col_width: Pt,
 ) {
-    let content_top = state.cursor_y + space_before;
-    register_paragraph_floats(state, floating_images, floating_shapes, content_top);
+    let paragraph_top = state.cursor_y;
+    register_paragraph_floats(state, floating_images, floating_shapes, paragraph_top);
     for active_float in &state.page_floats {
         if active_float.overlaps_y(state.cursor_y) && active_float.width >= col_width {
             state.cursor_y = state.cursor_y.max(active_float.page_y_end);
@@ -992,21 +1006,12 @@ fn keep_next_terminal_table(blocks: &[LayoutBlock], start: usize) -> Option<&Lay
     None
 }
 
-fn fresh_page_contextual_space_before(
-    block: &LayoutBlock,
-    previous_style_id: &Option<StyleId>,
-) -> Pt {
-    let LayoutBlock::Paragraph { style, .. } = block else {
-        return Pt::ZERO;
-    };
-    let effective = style.clone_for_layout();
-    if effective.contextual_spacing
-        && effective.style_id.is_some()
-        && effective.style_id.as_ref() == previous_style_id.as_ref()
-    {
-        effective.space_before
-    } else {
-        Pt::ZERO
+/// The space before `block`, which it loses at the top of a page that flow
+/// led to (§17.3.1.33); a table has none.
+fn leading_space_before(block: &LayoutBlock) -> Pt {
+    match block {
+        LayoutBlock::Paragraph { style, .. } => style.clone_for_layout().space_before,
+        LayoutBlock::Table { .. } => Pt::ZERO,
     }
 }
 
@@ -1354,14 +1359,12 @@ fn advance_column_or_page(
     block_idx: usize,
     ctx: &LayoutCtx<'_>,
     num_cols: usize,
-    para_start_y: &mut Pt,
 ) {
     if state.current_col + 1 < num_cols {
         state.advance_to_next_column();
     } else {
         state.push_new_page(block_idx, ctx);
     }
-    *para_start_y = state.cursor_y;
 }
 
 /// Place a splittable paragraph, breaking its lines across pages as needed.
@@ -1393,7 +1396,6 @@ fn emit_split_paragraph<'doc>(
     block_idx: usize,
     config: &PageConfig,
     ctx: &LayoutCtx<'_>,
-    para_start_y: &mut Pt,
     footnotes: &'doc [(Vec<Fragment>, ParagraphStyle)],
     content_width: Pt,
     blocks: &[LayoutBlock],
@@ -1499,10 +1501,11 @@ fn emit_split_paragraph<'doc>(
 
         // No legal placement here: move the whole remainder to the next
         // column/page and re-fit at the top (nothing emitted, so the drop cap
-        // and space_before are preserved for the real first segment).
+        // is preserved for the real first segment; §17.3.1.33 drops its space
+        // before there, see `continuation_style`).
         let Some(head) = head else {
             drop(placed);
-            advance_column_or_page(state, block_idx, ctx, num_cols, para_start_y);
+            advance_column_or_page(state, block_idx, ctx, num_cols);
             cont_style = continuation_style(
                 state,
                 blocks,
@@ -1548,7 +1551,7 @@ fn emit_split_paragraph<'doc>(
         let next_remaining = placed.fragments_from_line(head);
         drop(placed);
         first_segment = false;
-        advance_column_or_page(state, block_idx, ctx, num_cols, para_start_y);
+        advance_column_or_page(state, block_idx, ctx, num_cols);
         cont_style = continuation_style(
             state,
             blocks,
@@ -1580,7 +1583,9 @@ fn continuation_style(
     let col = state.current_col;
     let col_width = config.columns[col].width;
     let page_x = config.margins.left + config.columns[col].x_offset;
-    let space_before = if first_segment {
+    // §17.3.1.33: a first segment moved whole by flow loses its space before,
+    // like any paragraph at the top of a page or column flow led to.
+    let space_before = if first_segment && !state.top_drops_space_before {
         style.space_before
     } else {
         Pt::ZERO
@@ -1593,10 +1598,10 @@ fn continuation_style(
         col_width,
     );
     let mut cs = style.clone();
+    cs.space_before = space_before;
     if !first_segment {
         cs.drop_cap = None;
         cs.indent_first_line = Pt::ZERO;
-        cs.space_before = Pt::ZERO;
     }
     cs.page_floats = floats;
     cs.page_y = state.cursor_y;
@@ -1650,6 +1655,36 @@ pub(crate) struct SectionStart<'a> {
     /// §17.10.6: logical number of the section's first page, with
     /// `w:pgNumType/@start` applied. Drives §20.4.3.1 float mirroring.
     pub logical_page_base: usize,
+    /// §17.3.1.33: whether the document's Word version drops the space before
+    /// a paragraph that begins a page through its own page break.
+    pub own_page_break_spacing: OwnPageBreakSpacing,
+}
+
+/// §17.3.1.33: the space before a paragraph that begins a page through its
+/// own `pageBreakBefore`, or through a page break at its start.
+///
+/// At the top of any other page or column reached by flow or by a page break,
+/// Word drops the space before in every compatibility mode. For a paragraph's
+/// own break the modes differ: Word 2013 (`compatibilityMode` 15) and later
+/// drop it as well, earlier modes keep it — and so does a document that states
+/// no mode, which Word opens in a compatibility mode.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum OwnPageBreakSpacing {
+    /// Before Word 2013, or no mode stated.
+    #[default]
+    Keep,
+    /// Word 2013 and later.
+    Drop,
+}
+
+impl OwnPageBreakSpacing {
+    pub(crate) fn for_compatibility_mode(mode: Option<u32>) -> Self {
+        if mode.is_some_and(|mode| mode >= 15) {
+            Self::Drop
+        } else {
+            Self::Keep
+        }
+    }
 }
 
 /// §17.6.22: who owns a section's last page.
@@ -1722,6 +1757,7 @@ pub fn layout_section(
             // A section laid out on its own starts at page 1 — the §17.10.6
             // renumbering only exists across a document's section list.
             logical_page_base: 1,
+            own_page_break_spacing: OwnPageBreakSpacing::default(),
         },
     )
     .pages
@@ -1773,6 +1809,7 @@ pub(crate) fn layout_section_with_clearance(
         clearance,
         last_page,
         logical_page_base,
+        own_page_break_spacing,
     } = start;
     let content_width = config.content_width();
     let num_cols = config.num_columns();
@@ -1781,6 +1818,7 @@ pub(crate) fn layout_section_with_clearance(
         config,
         clearance,
         last_page,
+        own_page_break_spacing,
         measure_text,
         separator_indent,
         default_line_height,
@@ -1872,11 +1910,10 @@ pub(crate) fn layout_section_with_clearance(
                             LayoutBlock::Table { .. } => state.cursor_y,
                         };
                         let full_page_height = ctx.page_bounds(state.page_index + 1).height();
-                        let fresh_page_group_height = group.total_height(false)
-                            - fresh_page_contextual_space_before(
-                                &blocks[block_idx],
-                                &state.prev_style_id,
-                            );
+                        // §17.3.1.33: on the fresh page the group's first
+                        // paragraph loses its space before.
+                        let fresh_page_group_height =
+                            group.total_height(false) - leading_space_before(&blocks[block_idx]);
                         let should_move = match keep_next_terminal_table(blocks, block_idx) {
                             Some(LayoutBlock::Table {
                                 rows,
@@ -1958,9 +1995,15 @@ pub(crate) fn layout_section_with_clearance(
                     state.page_floats.len(), state.current_page_abs_floats.len()
                 );
 
-                // §17.3.1.33: suppress space_before for the structural first
-                // paragraph of a section on its initial page.
-                if state.cursor_y <= state.column_top && state.first_on_section_page {
+                // §17.3.1.33: at the top of a page or column that flow or a page
+                // break led to, Word drops the space before. The first page of a
+                // section and an explicit column break keep it, and so does a
+                // paragraph's own `pageBreakBefore` before Word 2013.
+                if state.cursor_y <= state.column_top
+                    && state.top_drops_space_before
+                    && !(*page_break_before
+                        && ctx.own_page_break_spacing == OwnPageBreakSpacing::Keep)
+                {
                     effective_style.space_before = Pt::ZERO;
                 }
                 // §17.3.1.24: paragraph border grouping — consecutive paragraphs
@@ -1973,6 +2016,7 @@ pub(crate) fn layout_section_with_clearance(
                     }
                 }
                 // §17.3.1.9: spacing collapse (must happen before float registration).
+                let previous_bottom = state.cursor_y;
                 if effective_style.contextual_spacing
                     && effective_style.style_id.is_some()
                     && effective_style.style_id == state.prev_style_id
@@ -1982,6 +2026,12 @@ pub(crate) fn layout_section_with_clearance(
                     let collapse = state.prev_space_after.min(effective_style.space_before);
                     state.cursor_y -= collapse;
                 }
+                // §20.4.3.5: origin of this paragraph's anchored objects. On a
+                // fresh page or column it is the cursor there.
+                let mut paragraph_top = paragraph_top_edge(
+                    previous_bottom,
+                    state.cursor_y + effective_style.space_before,
+                );
 
                 // Paragraph-relative, non-wrapping pictures travel with their
                 // owner, including an otherwise empty anchor paragraph. Their
@@ -1998,7 +2048,7 @@ pub(crate) fn layout_section_with_clearance(
                 {
                     floating_images.iter().fold(Pt::ZERO, |height, image| {
                         if let FloatingImageY::RelativeToParagraph(offset) = image.y {
-                            height.max(effective_style.space_before + offset + image.size.height)
+                            height.max(paragraph_top - state.cursor_y + offset + image.size.height)
                         } else {
                             height
                         }
@@ -2015,20 +2065,22 @@ pub(crate) fn layout_section_with_clearance(
                     } else {
                         state.push_new_page(block_idx, &ctx);
                     }
+                    // §17.3.1.33: moved by flow, so the space before is dropped.
+                    effective_style.space_before = Pt::ZERO;
+                    paragraph_top = state.cursor_y;
                 }
 
                 // Register floating images (both relative and absolute).
                 // §20.4.2.18: wrapTopAndBottom images are emitted immediately
-                // and cursor_y advances past them — they act as block spacers.
-                // §20.4.2.10: paragraph-relative floats use the content area
-                // top (after space_before), not the total paragraph box top.
+                // and push the paragraph below them — they act as block spacers.
+                // §20.4.3.5: paragraph-relative floats are measured from the
+                // paragraph's top edge, not from the top of its text.
                 let float_checkpoint = ParagraphFloatCheckpoint::capture(&state);
-                let content_top = state.cursor_y + effective_style.space_before;
                 register_paragraph_floats(
                     &mut state,
                     floating_images,
                     floating_shapes,
-                    content_top,
+                    paragraph_top,
                 );
 
                 // Prune expired floats.
@@ -2056,7 +2108,6 @@ pub(crate) fn layout_section_with_clearance(
                 // §17.3.3.1: split paragraph at inline page breaks first,
                 // then §17.6.4: split each page-chunk at column breaks.
                 let page_chunks = split_at_page_breaks(fragments);
-                let mut para_start_y = state.cursor_y;
                 state.last_para_start_y = state.cursor_y;
                 // Issue #86 (float relocation): true once any of this paragraph's
                 // content has been placed, so a later overflow relocates its
@@ -2104,14 +2155,22 @@ pub(crate) fn layout_section_with_clearance(
                         }
                         state.push_new_page(block_idx, &ctx);
                         state.prev_space_after = Pt::ZERO;
-                        para_start_y = state.cursor_y;
+                        paragraph_top = state.cursor_y;
+                        // §17.3.1.33: text after a page break inside this
+                        // paragraph continues it, without space before; text
+                        // that only begins here, after a break at the
+                        // paragraph's start, loses it from Word 2013 on.
+                        if paragraph_content_placed
+                            || ctx.own_page_break_spacing == OwnPageBreakSpacing::Drop
+                        {
+                            effective_style.space_before = Pt::ZERO;
+                        }
                         if !paragraph_content_placed {
                             let col_width = config.columns[state.current_col].width;
                             register_destination_paragraph_floats(
                                 &mut state,
                                 floating_images,
                                 floating_shapes,
-                                effective_style.space_before,
                                 col_width,
                             );
                         }
@@ -2154,13 +2213,19 @@ pub(crate) fn layout_section_with_clearance(
                                 // All columns full — new page, reset to column 0.
                                 state.push_new_page(block_idx, &ctx);
                             }
+                            // §17.3.1.33: Word keeps the space before at the top
+                            // of the column an explicit column break leads to;
+                            // text continuing this paragraph has none.
+                            state.top_drops_space_before = false;
+                            if paragraph_content_placed {
+                                effective_style.space_before = Pt::ZERO;
+                            }
                             if !paragraph_content_placed && starts_new_page {
                                 let col_width = config.columns[state.current_col].width;
                                 register_destination_paragraph_floats(
                                     &mut state,
                                     floating_images,
                                     floating_shapes,
-                                    effective_style.space_before,
                                     col_width,
                                 );
                             }
@@ -2222,7 +2287,6 @@ pub(crate) fn layout_section_with_clearance(
                                 block_idx,
                                 config,
                                 &ctx,
-                                &mut para_start_y,
                                 footnotes,
                                 content_width,
                                 blocks,
@@ -2280,7 +2344,10 @@ pub(crate) fn layout_section_with_clearance(
                                 } else {
                                     state.push_new_page(block_idx, &ctx);
                                 }
-                                let destination_para_start_y = state.cursor_y;
+                                // §17.3.1.33: moved by flow, so the space before
+                                // is dropped at the destination.
+                                effective_style.space_before = Pt::ZERO;
+                                let destination_top = state.cursor_y;
                                 // Re-register this paragraph's own floats at the
                                 // destination when none of its content has landed
                                 // yet (§20.4.2).
@@ -2290,13 +2357,12 @@ pub(crate) fn layout_section_with_clearance(
                                         &mut state,
                                         floating_images,
                                         floating_shapes,
-                                        effective_style.space_before,
                                         col_width,
                                     );
                                 }
-                                // Update para_start_y after page/column change so
-                                // floating images use the correct position.
-                                para_start_y = destination_para_start_y;
+                                // The floats are drawn below from the paragraph's
+                                // top edge at its destination.
+                                paragraph_top = destination_top;
                                 effective_style.page_y = state.cursor_y;
                                 effective_style.page_x = col_x(state.current_col);
                                 effective_style.page_content_width =
@@ -2345,7 +2411,6 @@ pub(crate) fn layout_section_with_clearance(
                     state.pending_page_break = true;
                 }
 
-                state.first_on_section_page = false;
                 state.prev_borders = style.borders.clone();
                 state.prev_space_after = effective_style.space_after;
                 state.prev_style_id = effective_style.style_id.clone();
@@ -2358,7 +2423,7 @@ pub(crate) fn layout_section_with_clearance(
                     if fi.is_wrap_top_and_bottom() {
                         continue;
                     }
-                    let img_y = fi.y.at(parity, para_start_y + effective_style.space_before);
+                    let img_y = fi.y.at(parity, paragraph_top);
                     state.current_page.commands.push(DrawCommand::Image {
                         page_anchor: fi.page_anchor,
                         rect: PtRect::from_xywh(
@@ -2381,7 +2446,7 @@ pub(crate) fn layout_section_with_clearance(
                     if fs.is_wrap_top_and_bottom() {
                         continue;
                     }
-                    let shape_y = fs.y.at(parity, para_start_y + effective_style.space_before);
+                    let shape_y = fs.y.at(parity, paragraph_top);
                     state.current_page.commands.push(DrawCommand::Path {
                         origin: crate::render::geometry::PtOffset::new(
                             fs.x.resolve(parity),
@@ -2679,7 +2744,6 @@ pub(crate) fn layout_section_with_clearance(
                     }
                     state.cursor_y += slice.size.height;
                 }
-                state.first_on_section_page = false;
                 state.prev_borders = None; // table breaks border grouping
                 state.prev_space_after = Pt::ZERO;
                 state.prev_style_id = None;
