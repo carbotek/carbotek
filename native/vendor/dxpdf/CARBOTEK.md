@@ -77,10 +77,16 @@ Floating pictures without text wrapping (`wrapNone`), for example a signature dr
    unstated, so a table's `<w:left w:w="0"/>` kept its style's 108-twip margin (text 5.4 pt right of
    Word), and a style stating one side dropped the other three of its parent.
 
-Tests: unit tests in `section/stacker.rs` and `section/mod.rs` (§20.4.3.5 sections),
+9. The first paragraph of the document, and of a section that starts on a new page, keeps its space
+   before at the page top (`section/layout.rs`). Upstream zeroed it through a `first_on_section_page`
+   flag, which is removed; Word 2013+ and Word's compatibility modes both apply that space.
+
+Tests: unit tests in `section/stacker.rs` and `section/mod.rs` (§20.4.3.5 sections,
+`space_before_applies_to_the_first_paragraph_of_a_section`),
 `build/table.rs` (`an_explicit_zero_table_cell_margin_overrides_the_style`), `resolve/properties.rs`
 (`table_cell_margins_*`) and `model/geometry.rs`; end to end in
-`tests/regression/test_pdf_paragraph_anchors.py` and `tests/regression/test_pdf_table_cell_margins.py`.
+`tests/regression/test_pdf_paragraph_anchors.py`, `tests/regression/test_pdf_table_cell_margins.py` and
+`tests/regression/test_pdf_section_start_spacing.py`.
 The Python checks compare synthetic documents that differ only in spacing or margins, so they hold
 with any installed font; each was also evaluated on Word's own PDF export of the same documents.
 

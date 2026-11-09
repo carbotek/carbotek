@@ -102,8 +102,6 @@ struct PageLayoutState<'doc> {
         &'doc [super::super::fragment::Fragment],
         &'doc ParagraphStyle,
     )>,
-    /// §17.3.1.33: true until the structural first content block is placed.
-    first_on_section_page: bool,
     /// §17.3.1.9: space_after of the previous paragraph for spacing collapse.
     prev_space_after: Pt,
     /// §17.3.1.9: style_id of the previous paragraph for contextual spacing.
@@ -178,9 +176,6 @@ impl<'doc> PageLayoutState<'doc> {
                 bottom: c.bottom,
                 page_footnotes: Vec::new(),
                 carried_footnotes: c.page_footnotes,
-                // §17.3.1.33: the page top is above the preceding section's
-                // content, not here — space_before must not be suppressed.
-                first_on_section_page: false,
                 prev_space_after: c.prev_space_after,
                 prev_style_id: c.prev_style_id,
                 prev_borders: c.prev_borders,
@@ -206,7 +201,6 @@ impl<'doc> PageLayoutState<'doc> {
                 bottom: bounds.bottom,
                 page_footnotes: Vec::new(),
                 carried_footnotes: Vec::new(),
-                first_on_section_page: true,
                 prev_space_after: Pt::ZERO,
                 prev_style_id: None,
                 prev_borders: None,
@@ -528,7 +522,6 @@ struct PageReplayCheckpoint<'doc> {
         &'doc [super::super::fragment::Fragment],
         &'doc ParagraphStyle,
     )>,
-    first_on_section_page: bool,
     prev_space_after: Pt,
     prev_style_id: Option<StyleId>,
     prev_borders: Option<ParagraphBorderStyle>,
@@ -554,7 +547,6 @@ impl<'doc> PageReplayCheckpoint<'doc> {
             deepest_column_bottom: state.deepest_column_bottom,
             bottom: state.bottom,
             page_footnotes: state.page_footnotes.clone(),
-            first_on_section_page: state.first_on_section_page,
             prev_space_after: state.prev_space_after,
             prev_style_id: state.prev_style_id.clone(),
             prev_borders: state.prev_borders.clone(),
@@ -579,7 +571,6 @@ impl<'doc> PageReplayCheckpoint<'doc> {
         state.deepest_column_bottom = self.deepest_column_bottom;
         state.bottom = self.bottom;
         state.page_footnotes.clone_from(&self.page_footnotes);
-        state.first_on_section_page = self.first_on_section_page;
         state.prev_space_after = self.prev_space_after;
         state.prev_style_id.clone_from(&self.prev_style_id);
         state.prev_borders.clone_from(&self.prev_borders);
@@ -1962,11 +1953,8 @@ pub(crate) fn layout_section_with_clearance(
                     state.page_floats.len(), state.current_page_abs_floats.len()
                 );
 
-                // §17.3.1.33: suppress space_before for the structural first
-                // paragraph of a section on its initial page.
-                if state.cursor_y <= state.column_top && state.first_on_section_page {
-                    effective_style.space_before = Pt::ZERO;
-                }
+                // §17.3.1.33: the first paragraph of the document or of a section
+                // keeps its space before at the top of the page, as in Word.
                 // §17.3.1.24: paragraph border grouping — consecutive paragraphs
                 // with identical borders suppress interior top borders.
                 if effective_style.borders.is_some()
@@ -2351,7 +2339,6 @@ pub(crate) fn layout_section_with_clearance(
                     state.pending_page_break = true;
                 }
 
-                state.first_on_section_page = false;
                 state.prev_borders = style.borders.clone();
                 state.prev_space_after = effective_style.space_after;
                 state.prev_style_id = effective_style.style_id.clone();
@@ -2685,7 +2672,6 @@ pub(crate) fn layout_section_with_clearance(
                     }
                     state.cursor_y += slice.size.height;
                 }
-                state.first_on_section_page = false;
                 state.prev_borders = None; // table breaks border grouping
                 state.prev_space_after = Pt::ZERO;
                 state.prev_style_id = None;

@@ -2088,10 +2088,12 @@ mod tests {
         assert_eq!(text_count, 1);
     }
 
-    // ── §17.3.1.33 space_before suppression tests ──────────────────────
+    // ── §17.3.1.33 space_before at the page top ─────────────────────────
 
+    /// §17.3.1.33: Word keeps the space before of the first paragraph of the
+    /// document, and of a section starting on a new page, at the page top.
     #[test]
-    fn space_before_suppressed_for_first_paragraph_of_section() {
+    fn space_before_applies_to_the_first_paragraph_of_a_section() {
         let style = ParagraphStyle {
             space_before: Pt::new(24.0),
             ..Default::default()
@@ -2107,14 +2109,15 @@ mod tests {
         let config = small_config();
         let pages = layout_section(&blocks, &config, None, Pt::ZERO, Pt::new(14.0), None);
 
-        // First paragraph on the section's initial page: space_before suppressed.
-        if let Some(DrawCommand::Text { position, .. }) = pages[0].commands.first() {
-            assert!(
-                position.y.raw() < config.margins.top.raw() + 24.0,
-                "space_before should be suppressed: y={}",
-                position.y.raw()
-            );
-        }
+        let Some(DrawCommand::Text { position, .. }) = pages[0].commands.first() else {
+            panic!("the heading is the first command");
+        };
+        let expected = config.margins.top.raw() + 24.0 + 14.0 * 0.7;
+        assert!(
+            (position.y.raw() - expected).abs() < 1e-3,
+            "baseline 24pt below the margin, then the ascent: y={}",
+            position.y.raw()
+        );
     }
 
     #[test]
@@ -3721,8 +3724,7 @@ mod tests {
     }
 
     /// "top" (one 14pt line, `after` below it), then "anchor" with `before`
-    /// and the given float. The first paragraph of a section loses its space
-    /// before, so the anchor is the second one.
+    /// and the given float.
     fn anchor_after_top(after: f32, before: f32, float: FloatingImage) -> Vec<LayoutBlock> {
         let paragraph =
             |text: &str, space_before: f32, space_after: f32, floats| LayoutBlock::Paragraph {
