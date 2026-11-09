@@ -3709,4 +3709,114 @@ mod tests {
             "all words land in one column or the other"
         );
     }
+
+    // ── §20.4.3.5 paragraph-relative origin in the body ──────────────────
+
+    /// A 200x400 page with 10pt margins: room for a few paragraphs and a band.
+    fn anchor_page_config() -> PageConfig {
+        PageConfig {
+            page_size: PtSize::new(Pt::new(200.0), Pt::new(400.0)),
+            ..small_config()
+        }
+    }
+
+    /// "top" (one 14pt line, `after` below it), then "anchor" with `before`
+    /// and the given float. The first paragraph of a section loses its space
+    /// before, so the anchor is the second one.
+    fn anchor_after_top(after: f32, before: f32, float: FloatingImage) -> Vec<LayoutBlock> {
+        let paragraph =
+            |text: &str, space_before: f32, space_after: f32, floats| LayoutBlock::Paragraph {
+                fragments: vec![text_frag(text, 30.0, 14.0)],
+                style: ParagraphStyle {
+                    space_before: Pt::new(space_before),
+                    space_after: Pt::new(space_after),
+                    ..Default::default()
+                },
+                page_break_before: false,
+                footnotes: vec![],
+                floating_images: floats,
+                floating_shapes: vec![],
+            };
+        vec![
+            paragraph("top", 0.0, after, vec![]),
+            paragraph("anchor", before, 0.0, vec![float]),
+        ]
+    }
+
+    /// (image y, "anchor" text y) on the single page.
+    fn anchor_geometry(blocks: &[LayoutBlock]) -> (f32, f32) {
+        let pages = layout_section(
+            blocks,
+            &anchor_page_config(),
+            None,
+            Pt::ZERO,
+            Pt::new(14.0),
+            None,
+        );
+        assert_eq!(pages.len(), 1);
+        let image = pages[0]
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                DrawCommand::Image { rect, .. } => Some(rect.origin.y.raw()),
+                _ => None,
+            })
+            .expect("the anchored image");
+        let text = pages[0]
+            .commands
+            .iter()
+            .find_map(|c| match c {
+                DrawCommand::Text { text, position, .. } if text.as_ref() == "anchor" => {
+                    Some(position.y.raw())
+                }
+                _ => None,
+            })
+            .expect("the anchor paragraph's text");
+        (image, text)
+    }
+
+    /// The edge sits below "top" (10 + 14); the 20pt space before lies between
+    /// the picture's origin and the text, whose baseline is 0.7 * 14 lower.
+    #[test]
+    fn body_paragraph_anchor_is_measured_from_above_the_space_before() {
+        let blocks = anchor_after_top(0.0, 20.0, floating_image(WrapMode::None, 10.0));
+        let (image, text) = anchor_geometry(&blocks);
+        assert!(
+            (image - 24.0).abs() < 1e-3,
+            "image at the top edge, got {image}"
+        );
+        assert!(
+            (text - (24.0 + 20.0 + 9.8)).abs() < 1e-3,
+            "text 20pt lower, got {text}"
+        );
+    }
+
+    /// A 24pt space after above absorbs the 12pt space before: the edge is the
+    /// text top.
+    #[test]
+    fn body_space_after_above_absorbs_the_space_before() {
+        let blocks = anchor_after_top(24.0, 12.0, floating_image(WrapMode::None, 10.0));
+        let (image, text) = anchor_geometry(&blocks);
+        assert!(
+            (image - 48.0).abs() < 1e-3,
+            "image at the text top, got {image}"
+        );
+        assert!((text - (48.0 + 9.8)).abs() < 1e-3, "got {text}");
+    }
+
+    /// §20.4.2.18: the band starts at the edge and pushes the paragraph, whose
+    /// text keeps its 20pt space before below the 30pt band.
+    #[test]
+    fn body_top_and_bottom_band_pushes_the_paragraph_from_its_top_edge() {
+        let blocks = anchor_after_top(0.0, 20.0, floating_image(WrapMode::TopAndBottom, 30.0));
+        let (image, text) = anchor_geometry(&blocks);
+        assert!(
+            (image - 24.0).abs() < 1e-3,
+            "band at the top edge, got {image}"
+        );
+        assert!(
+            (text - (24.0 + 30.0 + 20.0 + 9.8)).abs() < 1e-3,
+            "text below the band plus its space before, got {text}"
+        );
+    }
 }

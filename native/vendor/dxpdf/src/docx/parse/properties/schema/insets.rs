@@ -8,7 +8,7 @@ use crate::model::Dup;
 use serde::{Deserialize, Deserializer};
 
 use crate::docx::model::dimension::{Dimension, Twips};
-use crate::docx::model::geometry::{EdgeInsets, PartialEdgeInsets};
+use crate::docx::model::geometry::PartialEdgeInsets;
 use crate::docx::parse::primitives::integer_measure::{IntegerMeasure, MeasureKind};
 use crate::docx::parse::primitives::units::dimension_from_measure;
 
@@ -70,43 +70,22 @@ impl<'de> Deserialize<'de> for SideXml {
     }
 }
 
-/// Conversion used for the table-level default (`<w:tblCellMar>`). Per
-/// OOXML §17.4.42 a table default has no further inheritance, so missing
-/// sides collapse to zero.
-impl From<EdgeInsetsTwipsXml> for EdgeInsets<Twips> {
-    fn from(x: EdgeInsetsTwipsXml) -> Self {
-        Self::new(
-            Dup::from(x.top)
-                .into_value()
-                .and_then(|s| s.w)
-                .unwrap_or_default(),
-            Dup::from(x.right)
-                .into_value()
-                .and_then(|s| s.w)
-                .unwrap_or_default(),
-            Dup::from(x.bottom)
-                .into_value()
-                .and_then(|s| s.w)
-                .unwrap_or_default(),
-            Dup::from(x.left)
-                .into_value()
-                .and_then(|s| s.w)
-                .unwrap_or_default(),
-        )
-    }
-}
-
-/// Conversion used for per-cell overrides (`<w:tcMar>`, §17.4.68). Each
-/// child element (`<w:top>` §17.4.75, `<w:start>` §17.4.34, `<w:bottom>`
-/// §17.4.5, `<w:end>` §17.4.11) is an *exception* that overrides the
-/// corresponding side of the parent `<w:tblCellMar>` (§17.4.42).
+/// Conversion used for both cell-margin elements: per-cell overrides
+/// (`<w:tcMar>`, §17.4.68) and table defaults (`<w:tblCellMar>`, §17.4.42) on
+/// a table or a table style. Each child element (`<w:top>` §17.4.75,
+/// `<w:start>` §17.4.34, `<w:bottom>` §17.4.5, `<w:end>` §17.4.11) is an
+/// *exception* that overrides the corresponding side of the level below it:
+/// the cell's over the table default, the table's over its style's, a
+/// style's over its `basedOn` parent's.
 ///
 /// Per the spec, cascade is per-side: a side whose element is structurally
 /// absent inherits from the parent; a side whose element is present is an
 /// explicit override, including `<w:top w:w="0" w:type="dxa"/>` which is
 /// `CT_TblWidth` (§17.4.87) for "0 twips" — an explicit zero, not a
-/// placeholder for "no override". The layout layer resolves the partial
-/// override against the table-level default via
+/// placeholder for "no override". Word reads `<w:tblCellMar>` the same way:
+/// a table's `<w:left w:w="0"/>` removes its style's left margin and keeps
+/// the style's right one. The layering is [`PartialEdgeInsets::or`]; the
+/// layout layer resolves what is left against zero via
 /// [`PartialEdgeInsets::resolve_against`].
 impl From<EdgeInsetsTwipsXml> for PartialEdgeInsets<Twips> {
     fn from(x: EdgeInsetsTwipsXml) -> Self {
@@ -127,13 +106,13 @@ mod tests {
     fn side_widths_take_lengths_and_drop_percents() {
         let x: EdgeInsetsTwipsXml =
             quick_xml::de::from_str(r#"<m><top w="0.1in" type="dxa"/></m>"#).unwrap();
-        let insets = EdgeInsets::from(x);
-        assert_eq!(insets.top.raw(), 144, "0.1in in twips");
+        let insets = PartialEdgeInsets::from(x);
+        assert_eq!(side(insets.top), Some(144), "0.1in in twips");
 
         let x: EdgeInsetsTwipsXml =
             quick_xml::de::from_str(r#"<m><top w="5%" type="pct"/></m>"#).unwrap();
-        let insets = EdgeInsets::from(x);
-        assert_eq!(insets.top.raw(), 0, "percent side is dropped, not fatal");
+        let insets = PartialEdgeInsets::from(x);
+        assert_eq!(side(insets.top), None, "percent side is dropped, not fatal");
 
         let r: Result<EdgeInsetsTwipsXml, _> =
             quick_xml::de::from_str(r#"<m><top w="-1pt" type="dxa"/></m>"#);
@@ -148,10 +127,10 @@ mod tests {
     fn negative_percent_side_drops_without_failing() {
         let x: EdgeInsetsTwipsXml =
             quick_xml::de::from_str(r#"<m><top w="-5%" type="pct"/></m>"#).unwrap();
-        let insets = EdgeInsets::from(x);
+        let insets = PartialEdgeInsets::from(x);
         assert_eq!(
-            insets.top.raw(),
-            0,
+            side(insets.top),
+            None,
             "a negative percent side is dropped, not fatal"
         );
     }
@@ -165,10 +144,10 @@ mod tests {
     fn side_widths_drop_the_type_pct_spelling_of_percent_too() {
         let x: EdgeInsetsTwipsXml =
             quick_xml::de::from_str(r#"<m><top w="2500" type="pct"/></m>"#).unwrap();
-        let insets = EdgeInsets::from(x);
+        let insets = PartialEdgeInsets::from(x);
         assert_eq!(
-            insets.top.raw(),
-            0,
+            side(insets.top),
+            None,
             "type=\"pct\" with a bare number must drop, not read as 2500 twips"
         );
     }
@@ -179,19 +158,24 @@ mod tests {
     fn side_widths_drop_auto_and_nil_types() {
         let x: EdgeInsetsTwipsXml =
             quick_xml::de::from_str(r#"<m><top w="100" type="auto"/></m>"#).unwrap();
-        let insets = EdgeInsets::from(x);
+        let insets = PartialEdgeInsets::from(x);
         assert_eq!(
-            insets.top.raw(),
-            0,
+            side(insets.top),
+            None,
             "type=\"auto\" must drop, not read as twips"
         );
     }
 
     use super::*;
+    use crate::docx::model::geometry::EdgeInsets;
 
-    fn parse(xml: &str) -> EdgeInsets<Twips> {
+    fn parse(xml: &str) -> PartialEdgeInsets<Twips> {
         let x: EdgeInsetsTwipsXml = quick_xml::de::from_str(xml).unwrap();
         x.into()
+    }
+
+    fn side(value: Option<Dimension<Twips>>) -> Option<i64> {
+        value.map(|d| d.raw())
     }
 
     #[test]
@@ -204,10 +188,10 @@ mod tests {
                 <right w="75"/>
             </tcMar>"#,
         );
-        assert_eq!(e.top.raw(), 100);
-        assert_eq!(e.bottom.raw(), 200);
-        assert_eq!(e.left.raw(), 50);
-        assert_eq!(e.right.raw(), 75);
+        assert_eq!(side(e.top), Some(100));
+        assert_eq!(side(e.bottom), Some(200));
+        assert_eq!(side(e.left), Some(50));
+        assert_eq!(side(e.right), Some(75));
     }
 
     #[test]
@@ -218,17 +202,20 @@ mod tests {
                 <end w="120"/>
             </tcMar>"#,
         );
-        assert_eq!(e.left.raw(), 80);
-        assert_eq!(e.right.raw(), 120);
+        assert_eq!(side(e.left), Some(80));
+        assert_eq!(side(e.right), Some(120));
     }
 
+    /// §17.4.42: the same holds for a table default. A stated zero is a
+    /// value, an absent side is not, so a table can remove one side of its
+    /// style's margins and keep the others.
     #[test]
-    fn missing_sides_default_to_zero() {
-        let e = parse(r#"<tcMar><top w="100"/></tcMar>"#);
-        assert_eq!(e.top.raw(), 100);
-        assert_eq!(e.right.raw(), 0);
-        assert_eq!(e.bottom.raw(), 0);
-        assert_eq!(e.left.raw(), 0);
+    fn tbl_cell_mar_keeps_a_stated_zero_apart_from_an_absent_side() {
+        let e = parse(r#"<tblCellMar><left w="0" type="dxa"/></tblCellMar>"#);
+        assert_eq!(side(e.left), Some(0), "a stated zero");
+        assert_eq!(side(e.top), None);
+        assert_eq!(side(e.right), None);
+        assert_eq!(side(e.bottom), None);
     }
 
     /// Per OOXML §17.4.68, an absent child element in `<w:tcMar>` means

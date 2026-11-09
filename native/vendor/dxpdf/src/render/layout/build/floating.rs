@@ -1040,7 +1040,9 @@ fn resolve_anchor_y(
             AnchorFrame::Stack => FloatingImageY::RelativeToParagraph(Pt::from(*offset)),
             AnchorFrame::Page => match relative_from {
                 // §20.4.3.5 `paragraph`/`line`: the stacker, not the anchor,
-                // knows where the owning paragraph lands.
+                // knows where the owning paragraph lands. Word measures both
+                // from the paragraph's top edge, which is also the top of its
+                // first line (`section::types::paragraph_top_edge`).
                 AnchorRelativeFrom::Paragraph | AnchorRelativeFrom::Line => {
                     FloatingImageY::RelativeToParagraph(Pt::from(*offset))
                 }

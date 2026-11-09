@@ -137,8 +137,37 @@ pub enum FloatingImageY {
     /// Absolute page position, mirrored — which reading applies depends on the
     /// page's [`PageParity`].
     PageParity { odd: Pt, even: Pt },
-    /// Relative to the paragraph's y position (offset added to cursor_y).
+    /// Offset from the owning paragraph's top edge, see [`paragraph_top_edge`].
     RelativeToParagraph(Pt),
+}
+
+/// §20.4.3.5: the top edge of a paragraph, the origin of its
+/// [`FloatingImageY::RelativeToParagraph`] anchors.
+///
+/// Word measures a `paragraph` offset, and a `line` offset on the first line,
+/// from where the paragraph starts: the bottom of the preceding block
+/// *including* that block's space after, or the top of the page, column or
+/// cell. The text starts below that edge only by the space before that
+/// survives §17.3.1.9 collapse: all of `space_before` below a block without
+/// space after, the excess over a smaller space after, and nothing below a
+/// larger space after or under contextual spacing.
+///
+/// `previous_bottom` is the cursor before the collapse and `content_top` the
+/// top of the first line. Contextual spacing also removes the preceding
+/// block's space after, which puts `content_top` above `previous_bottom`; the
+/// edge is then the content top itself.
+pub(crate) fn paragraph_top_edge(previous_bottom: Pt, content_top: Pt) -> Pt {
+    previous_bottom.min(content_top)
+}
+
+/// §20.4.2.18: how far a `wrapTopAndBottom` band pushes the paragraph that
+/// owns it.
+///
+/// Word moves the whole paragraph below the band, so its text still starts its
+/// own space before below the band's bottom. A band that ends above the
+/// paragraph's top edge (a negative `wp:posOffset`) moves nothing.
+pub(crate) fn top_and_bottom_push(paragraph_top: Pt, band_bottom: Pt) -> Pt {
+    (band_bottom - paragraph_top).max(Pt::ZERO)
 }
 
 impl FloatingImageY {
@@ -158,9 +187,9 @@ impl FloatingImageY {
 
     /// The page-space y this object takes on a page of the given parity.
     ///
-    /// `paragraph_top` is where the owning paragraph's content starts; only
-    /// [`Self::RelativeToParagraph`] reads it, and the two absolute cases
-    /// ignore it entirely.
+    /// `paragraph_top` is the owning paragraph's top edge ([`paragraph_top_edge`]),
+    /// not the top of its text; only [`Self::RelativeToParagraph`] reads it,
+    /// and the two absolute cases ignore it entirely.
     pub fn at(self, parity: PageParity, paragraph_top: Pt) -> Pt {
         match self {
             Self::Absolute(y) => y,

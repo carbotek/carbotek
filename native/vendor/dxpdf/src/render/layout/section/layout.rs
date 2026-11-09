@@ -21,8 +21,8 @@ use super::helpers::{
     render_page_footnotes, split_at_column_breaks, split_at_page_breaks, table_x_offset,
 };
 use super::types::{
-    ContinuationState, FloatingImage, FloatingImageY, FloatingShape, LayoutBlock, PageParity,
-    WrapMode,
+    paragraph_top_edge, top_and_bottom_push, ContinuationState, FloatingImage, FloatingImageY,
+    FloatingShape, LayoutBlock, PageParity, WrapMode,
 };
 use super::FLOAT_DEDUP_EPSILON_PT;
 use super::FOOTNOTE_SEPARATOR_GAP;
@@ -713,15 +713,19 @@ fn emit_shape_text(state: &mut PageLayoutState<'_>, fs: &FloatingShape, shape_y:
     }
 }
 
+/// Register a paragraph's floats against its top edge (`paragraph_top`,
+/// [`paragraph_top_edge`]). `wrapTopAndBottom` objects are drawn now and push
+/// the cursor, and with it the whole paragraph, below their band.
 fn register_paragraph_floats(
     state: &mut PageLayoutState<'_>,
     floating_images: &[FloatingImage],
     floating_shapes: &[FloatingShape],
-    content_top: Pt,
+    paragraph_top: Pt,
 ) {
     let parity = state.parity();
+    let mut band_bottom: Option<Pt> = None;
     for fi in floating_images {
-        let y_start = fi.y.at(parity, content_top);
+        let y_start = fi.y.at(parity, paragraph_top);
         let y_end = y_start + fi.size.height;
         if fi.is_wrap_top_and_bottom() {
             state.current_page.commands.push(DrawCommand::Image {
@@ -736,9 +740,7 @@ fn register_paragraph_floats(
                 src_rect: fi.src_rect,
                 transform: fi.transform,
             });
-            if y_end > state.cursor_y {
-                state.cursor_y = y_end;
-            }
+            band_bottom = Some(band_bottom.map_or(y_end, |bottom| bottom.max(y_end)));
         } else if fi.wrap_mode.registers_as_wrap_float() {
             let float_entry = float::ActiveFloat {
                 page_x: fi.x.resolve(parity) - fi.dist_left,
@@ -763,7 +765,7 @@ fn register_paragraph_floats(
         if matches!(fs.wrap_mode, WrapMode::None) {
             continue;
         }
-        let y_start = fs.y.at(parity, content_top);
+        let y_start = fs.y.at(parity, paragraph_top);
         let y_end = y_start + fs.size.height;
         if fs.is_wrap_top_and_bottom() {
             let shape_y = y_start;
@@ -779,9 +781,7 @@ fn register_paragraph_floats(
                 effects: fs.effects.clone(),
             });
             emit_shape_text(state, fs, shape_y);
-            if y_end > state.cursor_y {
-                state.cursor_y = y_end;
-            }
+            band_bottom = Some(band_bottom.map_or(y_end, |bottom| bottom.max(y_end)));
         } else {
             let float_entry = float::ActiveFloat {
                 page_x: fs.x.resolve(parity) - fs.dist_left,
@@ -802,17 +802,24 @@ fn register_paragraph_floats(
             state.page_floats.push(float_entry);
         }
     }
+
+    // §20.4.2.18: the band pushes the whole paragraph down, so the text keeps
+    // its own space before below the band.
+    if let Some(bottom) = band_bottom {
+        state.cursor_y += top_and_bottom_push(paragraph_top, bottom);
+    }
 }
 
+/// Register a paragraph's floats after it moved to a fresh page or column,
+/// whose cursor is the paragraph's top edge.
 fn register_destination_paragraph_floats(
     state: &mut PageLayoutState<'_>,
     floating_images: &[FloatingImage],
     floating_shapes: &[FloatingShape],
-    space_before: Pt,
     col_width: Pt,
 ) {
-    let content_top = state.cursor_y + space_before;
-    register_paragraph_floats(state, floating_images, floating_shapes, content_top);
+    let paragraph_top = state.cursor_y;
+    register_paragraph_floats(state, floating_images, floating_shapes, paragraph_top);
     for active_float in &state.page_floats {
         if active_float.overlaps_y(state.cursor_y) && active_float.width >= col_width {
             state.cursor_y = state.cursor_y.max(active_float.page_y_end);
@@ -1354,14 +1361,12 @@ fn advance_column_or_page(
     block_idx: usize,
     ctx: &LayoutCtx<'_>,
     num_cols: usize,
-    para_start_y: &mut Pt,
 ) {
     if state.current_col + 1 < num_cols {
         state.advance_to_next_column();
     } else {
         state.push_new_page(block_idx, ctx);
     }
-    *para_start_y = state.cursor_y;
 }
 
 /// Place a splittable paragraph, breaking its lines across pages as needed.
@@ -1393,7 +1398,6 @@ fn emit_split_paragraph<'doc>(
     block_idx: usize,
     config: &PageConfig,
     ctx: &LayoutCtx<'_>,
-    para_start_y: &mut Pt,
     footnotes: &'doc [(Vec<Fragment>, ParagraphStyle)],
     content_width: Pt,
     blocks: &[LayoutBlock],
@@ -1502,7 +1506,7 @@ fn emit_split_paragraph<'doc>(
         // and space_before are preserved for the real first segment).
         let Some(head) = head else {
             drop(placed);
-            advance_column_or_page(state, block_idx, ctx, num_cols, para_start_y);
+            advance_column_or_page(state, block_idx, ctx, num_cols);
             cont_style = continuation_style(
                 state,
                 blocks,
@@ -1548,7 +1552,7 @@ fn emit_split_paragraph<'doc>(
         let next_remaining = placed.fragments_from_line(head);
         drop(placed);
         first_segment = false;
-        advance_column_or_page(state, block_idx, ctx, num_cols, para_start_y);
+        advance_column_or_page(state, block_idx, ctx, num_cols);
         cont_style = continuation_style(
             state,
             blocks,
@@ -1973,6 +1977,7 @@ pub(crate) fn layout_section_with_clearance(
                     }
                 }
                 // §17.3.1.9: spacing collapse (must happen before float registration).
+                let previous_bottom = state.cursor_y;
                 if effective_style.contextual_spacing
                     && effective_style.style_id.is_some()
                     && effective_style.style_id == state.prev_style_id
@@ -1982,6 +1987,12 @@ pub(crate) fn layout_section_with_clearance(
                     let collapse = state.prev_space_after.min(effective_style.space_before);
                     state.cursor_y -= collapse;
                 }
+                // §20.4.3.5: origin of this paragraph's anchored objects. On a
+                // fresh page or column it is the cursor there.
+                let mut paragraph_top = paragraph_top_edge(
+                    previous_bottom,
+                    state.cursor_y + effective_style.space_before,
+                );
 
                 // Paragraph-relative, non-wrapping pictures travel with their
                 // owner, including an otherwise empty anchor paragraph. Their
@@ -1998,7 +2009,7 @@ pub(crate) fn layout_section_with_clearance(
                 {
                     floating_images.iter().fold(Pt::ZERO, |height, image| {
                         if let FloatingImageY::RelativeToParagraph(offset) = image.y {
-                            height.max(effective_style.space_before + offset + image.size.height)
+                            height.max(paragraph_top - state.cursor_y + offset + image.size.height)
                         } else {
                             height
                         }
@@ -2015,20 +2026,20 @@ pub(crate) fn layout_section_with_clearance(
                     } else {
                         state.push_new_page(block_idx, &ctx);
                     }
+                    paragraph_top = state.cursor_y;
                 }
 
                 // Register floating images (both relative and absolute).
                 // §20.4.2.18: wrapTopAndBottom images are emitted immediately
-                // and cursor_y advances past them — they act as block spacers.
-                // §20.4.2.10: paragraph-relative floats use the content area
-                // top (after space_before), not the total paragraph box top.
+                // and push the paragraph below them — they act as block spacers.
+                // §20.4.3.5: paragraph-relative floats are measured from the
+                // paragraph's top edge, not from the top of its text.
                 let float_checkpoint = ParagraphFloatCheckpoint::capture(&state);
-                let content_top = state.cursor_y + effective_style.space_before;
                 register_paragraph_floats(
                     &mut state,
                     floating_images,
                     floating_shapes,
-                    content_top,
+                    paragraph_top,
                 );
 
                 // Prune expired floats.
@@ -2056,7 +2067,6 @@ pub(crate) fn layout_section_with_clearance(
                 // §17.3.3.1: split paragraph at inline page breaks first,
                 // then §17.6.4: split each page-chunk at column breaks.
                 let page_chunks = split_at_page_breaks(fragments);
-                let mut para_start_y = state.cursor_y;
                 state.last_para_start_y = state.cursor_y;
                 // Issue #86 (float relocation): true once any of this paragraph's
                 // content has been placed, so a later overflow relocates its
@@ -2104,14 +2114,13 @@ pub(crate) fn layout_section_with_clearance(
                         }
                         state.push_new_page(block_idx, &ctx);
                         state.prev_space_after = Pt::ZERO;
-                        para_start_y = state.cursor_y;
+                        paragraph_top = state.cursor_y;
                         if !paragraph_content_placed {
                             let col_width = config.columns[state.current_col].width;
                             register_destination_paragraph_floats(
                                 &mut state,
                                 floating_images,
                                 floating_shapes,
-                                effective_style.space_before,
                                 col_width,
                             );
                         }
@@ -2160,7 +2169,6 @@ pub(crate) fn layout_section_with_clearance(
                                     &mut state,
                                     floating_images,
                                     floating_shapes,
-                                    effective_style.space_before,
                                     col_width,
                                 );
                             }
@@ -2222,7 +2230,6 @@ pub(crate) fn layout_section_with_clearance(
                                 block_idx,
                                 config,
                                 &ctx,
-                                &mut para_start_y,
                                 footnotes,
                                 content_width,
                                 blocks,
@@ -2280,7 +2287,7 @@ pub(crate) fn layout_section_with_clearance(
                                 } else {
                                     state.push_new_page(block_idx, &ctx);
                                 }
-                                let destination_para_start_y = state.cursor_y;
+                                let destination_top = state.cursor_y;
                                 // Re-register this paragraph's own floats at the
                                 // destination when none of its content has landed
                                 // yet (§20.4.2).
@@ -2290,13 +2297,12 @@ pub(crate) fn layout_section_with_clearance(
                                         &mut state,
                                         floating_images,
                                         floating_shapes,
-                                        effective_style.space_before,
                                         col_width,
                                     );
                                 }
-                                // Update para_start_y after page/column change so
-                                // floating images use the correct position.
-                                para_start_y = destination_para_start_y;
+                                // The floats are drawn below from the paragraph's
+                                // top edge at its destination.
+                                paragraph_top = destination_top;
                                 effective_style.page_y = state.cursor_y;
                                 effective_style.page_x = col_x(state.current_col);
                                 effective_style.page_content_width =
@@ -2358,7 +2364,7 @@ pub(crate) fn layout_section_with_clearance(
                     if fi.is_wrap_top_and_bottom() {
                         continue;
                     }
-                    let img_y = fi.y.at(parity, para_start_y + effective_style.space_before);
+                    let img_y = fi.y.at(parity, paragraph_top);
                     state.current_page.commands.push(DrawCommand::Image {
                         page_anchor: fi.page_anchor,
                         rect: PtRect::from_xywh(
@@ -2381,7 +2387,7 @@ pub(crate) fn layout_section_with_clearance(
                     if fs.is_wrap_top_and_bottom() {
                         continue;
                     }
-                    let shape_y = fs.y.at(parity, para_start_y + effective_style.space_before);
+                    let shape_y = fs.y.at(parity, paragraph_top);
                     state.current_page.commands.push(DrawCommand::Path {
                         origin: crate::render::geometry::PtOffset::new(
                             fs.x.resolve(parity),

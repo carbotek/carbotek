@@ -58,6 +58,31 @@ Floating pictures without text wrapping (`wrapNone`), for example a signature dr
    local offsets to these references. Page-relative vertical positions do not inflate the row's
    local page-fit height. Paragraph/column references keep their existing local behavior. Wrapping
    cell drawings and VML are outside this change.
+7. Paragraph-relative floats (`relativeFrom="paragraph"`, and `line` on the first line) are measured
+   from the paragraph's top edge, as Word does: the bottom of the preceding block including its space
+   after, or the top of the page, column or cell (`section/types.rs`, `paragraph_top_edge`). Upstream
+   used the top of the text, which put pictures one `space_before` too low. The text keeps only the
+   space before that survives collapse: all of it below a block without space after, the excess over
+   a smaller space after, none below a larger space after or under contextual spacing. One origin
+   serves registration, page-fit, drawing and re-registration after a page or column move, in the
+   body (`layout.rs`) and in cells and headers/footers (`stacker.rs`). A `wrapTopAndBottom` band
+   starts at that edge and pushes the whole paragraph below it, so the text keeps its space before
+   under the band (`top_and_bottom_push`); this replaces the stacker's subtraction of `space_before`
+   after the band. All floats of one paragraph share the origin, so a band no longer moves its
+   paragraph's other floats.
+8. `<w:tblCellMar>` keeps unstated sides apart from a stated zero: `TableProperties::cell_margins` is a
+   `PartialEdgeInsets`, like `<w:tcMar>`. Sides cascade one by one through `basedOn`, the
+   `wholeTable` overlay (`resolve/properties.rs`) and the table's own `tblPr` (`build/table.rs`); a
+   side stated nowhere is zero. Upstream parsed missing sides as zero and then read every zero as
+   unstated, so a table's `<w:left w:w="0"/>` kept its style's 108-twip margin (text 5.4 pt right of
+   Word), and a style stating one side dropped the other three of its parent.
+
+Tests: unit tests in `section/stacker.rs` and `section/mod.rs` (§20.4.3.5 sections),
+`build/table.rs` (`an_explicit_zero_table_cell_margin_overrides_the_style`), `resolve/properties.rs`
+(`table_cell_margins_*`) and `model/geometry.rs`; end to end in
+`tests/regression/test_pdf_paragraph_anchors.py` and `tests/regression/test_pdf_table_cell_margins.py`.
+The Python checks compare synthetic documents that differ only in spacing or margins, so they hold
+with any installed font; each was also evaluated on Word's own PDF export of the same documents.
 
 Tests: `tests/regression/test_picture_geometry.py` checks rotation, both flips, crop-aware template
 image fitting, independent transforms for shared media, unchanged page-fit on rotation, mixed local/page axes,
