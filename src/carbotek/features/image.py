@@ -24,6 +24,7 @@ from carbotek.errors import FeatureUnavailable, MarkerResolutionError
 from carbotek.markers import FormatterCall, Marker
 from carbotek.ooxml.image_types import MIME_EXTENSIONS, image_mime
 from carbotek.ooxml.ns import qn
+from carbotek.ooxml.parts import relationship_part_name
 from carbotek.ooxml.xml import parse_xml, serialize_xml
 from carbotek.package import TemplatePackage, TemplatePart
 
@@ -576,11 +577,6 @@ def _file_payload(value: str, configured_root: str | None = None) -> tuple[bytes
         return None
 
 
-def _rels_name(part_name: str) -> str:
-    parent, _, filename = part_name.rpartition("/")
-    return f"{parent}/_rels/{filename}.rels"
-
-
 def _relationships_root(
     package: TemplatePackage, replacements: Mapping[str, TemplatePart], name: str
 ) -> etree._Element:
@@ -596,7 +592,7 @@ def _append_relationship(
     image_id: int,
     extension: str,
 ) -> None:
-    name = _rels_name(consumer)
+    name = relationship_part_name(package.parts, consumer)
     root = roots.get(name)
     if root is None:
         root = _relationships_root(package, replacements, name)

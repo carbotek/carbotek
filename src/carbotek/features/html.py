@@ -1,23 +1,28 @@
 # pyright: strict, reportPrivateUsage=false
 """Safe, tree-based conversion of basic HTML markers into Word paragraphs."""
 
+import posixpath
 import re
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import Any
+from functools import cached_property
+from string import ascii_lowercase, ascii_uppercase
+from typing import Any, Literal
+from urllib.parse import unquote, urlsplit
 
 from lxml import etree, html  # pyright: ignore[reportAttributeAccessIssue]
 lazy from PIL import ImageColor
 
 from carbotek.docx.renderer import CONDITION_TESTS, DocxTextRenderer, formatter_argument, resolve_path
 from carbotek.docx.session import CURRENT_RENDER, feature_parse, feature_scan, feature_source
-from carbotek.errors import MarkerResolutionError
+from carbotek.errors import CorruptedTemplateError, MarkerResolutionError
 from carbotek.formatters import FormatterRegistry, MarkerContext, shared_registry
 from carbotek.formatters.docx import check_url
 from carbotek.formatters.number import number_string
 from carbotek.markers import Marker
 from carbotek.ooxml.ns import NAMESPACES, qn
+from carbotek.ooxml.parts import member_name, part_key, part_uri, relationship_part_name, target_name
 from carbotek.ooxml.xml import parse_xml, serialize_xml
 from carbotek.options import RenderOptions
 from carbotek.package import TemplatePackage, TemplatePart
@@ -44,16 +49,124 @@ _BLOCK_TAGS = {
     "table",
     "ul",
 }
-_REL = "http://schemas.openxmlformats.org/package/2006/relationships"
-_HYPERLINK_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"
-_NUMBERING_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering"
-_NUMBERING_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"
-_STYLES_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
-_STYLES_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
+_RELATIONSHIP_TYPE = NAMESPACES["r"] + "/"
+_ASCII_LOWER = str.maketrans(ascii_uppercase, ascii_lowercase)
+_MAX_NUMBERING_ID = (1 << 31) - 1
 _HEADING_STYLE = (("2F5496", 32), ("2F5496", 26), ("1F3763", 24), ("2F5496", 22), ("2F5496", 22), ("1F3763", 22))
 # Bullets of generated lists name no font, so they are drawn in the font of the item text. All three
 # characters are in both Windows-1251 and Windows-1252: a font that can show the text has them too.
 _BULLET_GLYPHS = ("\N{BULLET}", "\N{EN DASH}", "\N{MIDDLE DOT}")
+
+
+def _relationship_root(part: TemplatePart | None) -> etree._Element:
+    return parse_xml(part.content, part.name) if part is not None else etree.Element(qn("rel:Relationships"))
+
+
+def _decode_part_path(path: str) -> str | None:
+    try:
+        decoded = unquote(path, errors="strict")
+    except UnicodeDecodeError:
+        return None
+    if "\\" in decoded or decoded.count("/") != path.count("/") or re.search(r"[\x00-\x1f\x7f]", decoded):
+        return None
+    if any(
+        original != segment and segment in {".", ".."}
+        for original, segment in zip(path.split("/"), decoded.split("/"), strict=True)
+    ):
+        return None
+    return decoded
+
+
+@dataclass
+class _HtmlPart:
+    package: TemplatePackage
+    kind: Literal["styles", "numbering"]
+
+    @cached_property
+    def rels_name(self) -> str:
+        return relationship_part_name(self.package.parts, self.package.main_document)
+
+    @property
+    def relationship_type(self) -> str:
+        return _RELATIONSHIP_TYPE + self.kind
+
+    @cached_property
+    def target(self) -> str | None:
+        rels = _relationship_root(self.package.parts.get(self.rels_name))
+        for node in rels.findall(qn("rel:Relationship")):
+            if node.get("Type") != self.relationship_type:
+                continue
+            if node.get("TargetMode", "Internal") != "Internal":
+                raise CorruptedTemplateError(f"DOCX {self.kind} relationship must be internal")
+            raw_target = node.get("Target", "")
+            target = self._internal_path(raw_target)
+            if target is None:
+                raise CorruptedTemplateError(f"Invalid DOCX {self.kind} relationship target")
+            # Strip the package-root slash before normalizing so paths above it remain detectable.
+            name = (
+                target_name("", target[1:])
+                if target.startswith("/")
+                else target_name(self.package.main_document, target)
+            )
+            if name in {".", ".."} or name.startswith("../") or target.endswith(("/", "/.", "/..")):
+                raise CorruptedTemplateError(f"Invalid DOCX {self.kind} relationship target")
+            return name
+        return None
+
+    @staticmethod
+    def _internal_path(target: str) -> str | None:
+        if target.startswith("//") or any(char in target for char in "?#") or re.search(r"[\x00-\x20\x7f]", target):
+            return None
+        try:
+            reference = urlsplit(target)
+        except ValueError:
+            return None
+        if reference.scheme or reference.netloc:
+            return None
+        path = _decode_part_path(reference.path)
+        return reference.path if path is not None and path.strip() not in {"", ".", ".."} else None
+
+    @cached_property
+    def name(self) -> str:
+        return member_name(self.package.parts, self.target or f"word/{self.kind}.xml")
+
+    @property
+    def content_type(self) -> str:
+        return f"application/vnd.openxmlformats-officedocument.wordprocessingml.{self.kind}+xml"
+
+    def load(self) -> etree._Element | None:
+        part = self.package.parts.get(self.name)
+        if part is None:
+            if self.target is not None:
+                raise CorruptedTemplateError(f"Missing DOCX {self.kind} relationship target: {self.name}")
+            return None
+        if self.target is not None:
+            manifest = self.package.parts.get("[Content_Types].xml")
+            declarations = parse_xml(manifest.content) if manifest is not None else etree.Element("Types")
+            override = next(
+                (
+                    node
+                    for node in declarations.findall(qn("ct:Override"))
+                    if part_key(node.get("PartName", "")) == part_key(f"/{self.name}")
+                ),
+                None,
+            )
+            _, separator, extension = posixpath.basename(self.name).translate(_ASCII_LOWER).rpartition(".")
+            default = next(
+                (
+                    node
+                    for node in declarations.findall(qn("ct:Default"))
+                    if separator and node.get("Extension", "").translate(_ASCII_LOWER) == extension
+                ),
+                None,
+            )
+            declaration = override if override is not None else default
+            if declaration is None or declaration.get("ContentType", "").translate(_ASCII_LOWER) != self.content_type:
+                raise CorruptedTemplateError(f"Invalid DOCX {self.kind} ContentType: {self.name}")
+        root = parse_xml(part.content, part.name)
+        if root.tag != qn(f"w:{self.kind}"):
+            raise CorruptedTemplateError(f"Invalid DOCX {self.kind} part: {part.name}")
+        return root
 
 
 class _HtmlStyles:
@@ -65,17 +178,17 @@ class _HtmlStyles:
     """
 
     def __init__(self, package: TemplatePackage) -> None:
-        self.package = package
+        self.part = _HtmlPart(package, "styles")
         self.missing: set[str] = set()
         self._root: etree._Element | None = None
         self._ids: set[str] = set()
         self._by_name: dict[tuple[str, str], str] = {}
         self._normal = "Normal"
-        self._loaded = False
+        self.used = False
 
     @property
     def root(self) -> etree._Element:
-        """``word/styles.xml`` of the template (parsed on first use), or a new empty one."""
+        """Styles of the template (parsed on first use), or a new empty part."""
         self._load()
         if self._root is None:
             self._root = etree.Element(qn("w:styles"), nsmap={"w": NAMESPACES["w"]})
@@ -106,13 +219,12 @@ class _HtmlStyles:
         return fallback
 
     def _load(self) -> None:
-        if self._loaded:
+        if self.used:
             return
-        self._loaded = True
-        part = self.package.parts.get("word/styles.xml")
-        if part is None:
+        self.used = True
+        self._root = self.part.load()
+        if self._root is None:
             return
-        self._root = parse_xml(part.content)
         default = ""
         for style in self._root.findall(qn("w:style")):
             style_id = style.get(qn("w:styleId"), "")
@@ -128,38 +240,56 @@ class _HtmlStyles:
 
 class _HtmlNumbering:
     def __init__(self, package: TemplatePackage) -> None:
-        existing = package.parts.get("word/numbering.xml")
-        self.root = (
-            parse_xml(existing.content)
-            if existing is not None
-            else etree.Element(qn("w:numbering"), nsmap={"w": NAMESPACES["w"]})
-        )
-        self.abstract_ids = {
-            int(node.get(qn("w:abstractNumId"), ""))
-            for node in self.root.findall(qn("w:abstractNum"))
-            if node.get(qn("w:abstractNumId"), "").isdigit()
-        }
-        self.num_ids = {
-            int(node.get(qn("w:numId"), ""))
-            for node in self.root.findall(qn("w:num"))
-            if node.get(qn("w:numId"), "").isdigit()
-        }
+        self.part = _HtmlPart(package, "numbering")
         self.changed = False
+
+    @cached_property
+    def root(self) -> etree._Element:
+        existing = self.part.load()
+        if existing is not None:
+            return existing
+        return etree.Element(qn("w:numbering"), nsmap={"w": NAMESPACES["w"]})
+
+    @cached_property
+    def abstract_ids(self) -> set[int]:
+        return self._ids("w:abstractNum", "w:abstractNumId")
+
+    @cached_property
+    def num_ids(self) -> set[int]:
+        return self._ids("w:num", "w:numId")
+
+    def _ids(self, element: str, attribute: str) -> set[int]:
+        values = (node.get(qn(attribute), "").strip(" \t\r\n") for node in self.root.findall(qn(element)))
+        return {int(value) for value in values if re.fullmatch(r"[+-]?[0-9]+", value)}
+
+    @staticmethod
+    def _next_id(ids: set[int]) -> int:
+        candidate = max(999, max(ids, default=999)) + 1
+        if candidate > _MAX_NUMBERING_ID:
+            candidate = 1000
+            while candidate in ids:
+                candidate += 1
+        ids.add(candidate)
+        return candidate
 
     def new_list(self) -> tuple[int, etree._Element]:
         """One numbering per top-level HTML list (lib/html.js ``listId``); levels are added on use."""
-        abstract_id = max({999, *self.abstract_ids}) + 1
-        num_id = max({999, *self.num_ids}) + 1
-        self.abstract_ids.add(abstract_id)
-        self.num_ids.add(num_id)
+        abstract_id = self._next_id(self.abstract_ids)
+        num_id = self._next_id(self.num_ids)
         abstract = etree.Element(qn("w:abstractNum"))
+        number_tags = (qn("w:num"), qn("w:numIdMacAtCleanup"))
         first_number = next(
-            (index for index, child in enumerate(self.root) if child.tag == qn("w:num")), len(self.root)
+            (index for index, child in enumerate(self.root) if child.tag in number_tags), len(self.root)
         )
         self.root.insert(first_number, abstract)
         abstract.set(qn("w:abstractNumId"), str(abstract_id))
         etree.SubElement(abstract, qn("w:multiLevelType")).set(qn("w:val"), "hybridMultilevel")
-        number = etree.SubElement(self.root, qn("w:num"))
+        number = etree.Element(qn("w:num"))
+        cleanup = self.root.find(qn("w:numIdMacAtCleanup"))
+        if cleanup is None:
+            self.root.append(number)
+        else:
+            cleanup.addprevious(number)
         number.set(qn("w:numId"), str(num_id))
         etree.SubElement(number, qn("w:abstractNumId")).set(qn("w:val"), str(abstract_id))
         self.changed = True
@@ -179,22 +309,13 @@ class _HtmlNumbering:
         indent.set(qn("w:left"), str(720 + level * 720))
         indent.set(qn("w:hanging"), "360")
 
-    def part(self) -> TemplatePart:
-        return TemplatePart(
-            "word/numbering.xml",
-            serialize_xml(self.root),
-            True,
-        )
-
 
 class _HtmlLinks:
     def __init__(
         self, package: TemplatePackage, part_name: str, numbering: _HtmlNumbering, styles: _HtmlStyles
     ) -> None:
-        parent, _, filename = part_name.rpartition("/")
-        self.part_name = f"{parent}/_rels/{filename}.rels"
-        existing = package.parts.get(self.part_name)
-        self.root = parse_xml(existing.content) if existing is not None else etree.Element(f"{{{_REL}}}Relationships")
+        self.part_name = relationship_part_name(package.parts, part_name)
+        self.root = _relationship_root(package.parts.get(self.part_name))
         self.used = {node.get("Id") for node in self.root}
         self.urls: dict[str, str] = {}
         self.changed = False
@@ -223,9 +344,9 @@ class _HtmlLinks:
         self.urls[url] = relationship_id
         etree.SubElement(
             self.root,
-            f"{{{_REL}}}Relationship",
+            qn("rel:Relationship"),
             Id=relationship_id,
-            Type=_HYPERLINK_REL,
+            Type=_RELATIONSHIP_TYPE + "hyperlink",
             Target=url,
             TargetMode="External",
         )
@@ -236,51 +357,11 @@ class _HtmlLinks:
         return TemplatePart(self.part_name, serialize_xml(self.root), True)
 
 
-def _write_numbering(
-    package: TemplatePackage, replacements: dict[str, TemplatePart], numbering: _HtmlNumbering
-) -> bool:
-    if not numbering.changed:
-        return False
-    replacements["word/numbering.xml"] = numbering.part()
-    content_types = package.parts.get("[Content_Types].xml")
-    if content_types is not None:
-        types_root = parse_xml(replacements.get(content_types.name, content_types).content)
-        if all(node.get("PartName") != "/word/numbering.xml" for node in types_root):
-            etree.SubElement(types_root, qn("ct:Override"), PartName="/word/numbering.xml", ContentType=_NUMBERING_MIME)
-        replacements[content_types.name] = TemplatePart(
-            content_types.name,
-            serialize_xml(types_root),
-            True,
-        )
-    rel_name = "word/_rels/document.xml.rels"
-    existing_rels = replacements.get(rel_name) or package.parts.get(rel_name)
-    rel_root = (
-        parse_xml(existing_rels.content) if existing_rels is not None else etree.Element(f"{{{_REL}}}Relationships")
-    )
-    if all(node.get("Type") != _NUMBERING_REL for node in rel_root):
-        # Appendix C: lib/html.js uses the fixed id rIdCarbotekNumbering; a suffix only on a clash.
-        ids = {node.get("Id") for node in rel_root}
-        index = 0
-        candidate = "rIdCarbotekNumbering"
-        while candidate in ids:
-            index += 1
-            candidate = f"rIdCarbotekNumbering{index}"
-        etree.SubElement(
-            rel_root,
-            f"{{{_REL}}}Relationship",
-            Id=candidate,
-            Type=_NUMBERING_REL,
-            Target="numbering.xml",
-        )
-        replacements[rel_name] = TemplatePart(rel_name, serialize_xml(rel_root), True)
-    return True
-
-
-def _write_styles(package: TemplatePackage, replacements: dict[str, TemplatePart], styles: _HtmlStyles) -> bool:
+def _write_styles(replacements: dict[str, TemplatePart], styles: _HtmlStyles) -> None:
     """Add the fallback styles that the output uses and the template lacks, in a fixed order."""
     if not styles.missing:
-        return False
-    name = "word/styles.xml"
+        return
+    name = styles.part.name
     root = styles.root
     if "Hyperlink" in styles.missing:
         _add_hyperlink_style(root)
@@ -289,9 +370,9 @@ def _write_styles(package: TemplatePackage, replacements: dict[str, TemplatePart
             _add_heading_style(root, level, styles.normal)
     if "TableGrid" in styles.missing:
         _add_table_style(root)
+    if name in replacements:
+        raise CorruptedTemplateError(f"Conflicting DOCX styles part: {name}")
     replacements[name] = TemplatePart(name, serialize_xml(root), True)
-    _ensure_part_link(package, replacements, name, _STYLES_REL, _STYLES_MIME)
-    return True
 
 
 def _add_hyperlink_style(root: etree._Element) -> None:
@@ -348,27 +429,43 @@ def _add_table_style(root: etree._Element) -> None:
             border.set(qn(f"w:{attr}"), value)
 
 
-def _ensure_part_link(
-    package: TemplatePackage, replacements: dict[str, TemplatePart], name: str, relationship_type: str, mime: str
-) -> None:
+def _ensure_part_link(related: _HtmlPart, replacements: dict[str, TemplatePart]) -> bool:
+    if related.target is not None:
+        return False
+    package, name = related.package, related.name
     content_types = package.parts.get("[Content_Types].xml")
     if content_types is not None:
         root = parse_xml(replacements.get(content_types.name, content_types).content)
-        if all(node.get("PartName") != f"/{name}" for node in root):
-            etree.SubElement(root, qn("ct:Override"), PartName=f"/{name}", ContentType=mime)
-        replacements[content_types.name] = TemplatePart(content_types.name, serialize_xml(root), True)
-    rel_name = "word/_rels/document.xml.rels"
-    existing = replacements.get(rel_name) or package.parts.get(rel_name)
-    rels = parse_xml(existing.content) if existing is not None else etree.Element(f"{{{_REL}}}Relationships")
-    if all(node.get("Type") != relationship_type for node in rels):
-        used = {node.get("Id") for node in rels}
-        index = 0
-        while f"rIdCarbotekStyles{index}" in used:
-            index += 1
-        etree.SubElement(
-            rels, f"{{{_REL}}}Relationship", Id=f"rIdCarbotekStyles{index}", Type=relationship_type, Target="styles.xml"
+        mime = related.content_type
+        part_name = part_key(f"/{name}")
+        declaration = next(
+            (node for node in root.findall(qn("ct:Override")) if part_key(node.get("PartName", "")) == part_name),
+            None,
         )
-        replacements[rel_name] = TemplatePart(rel_name, serialize_xml(rels), True)
+        if declaration is not None and declaration.get("ContentType", "").translate(_ASCII_LOWER) != mime:
+            raise CorruptedTemplateError(f"Invalid DOCX {related.kind} ContentType: {name}")
+        if declaration is None:
+            etree.SubElement(root, qn("ct:Override"), PartName=part_uri(f"/{name}"), ContentType=mime)
+            replacements[content_types.name] = TemplatePart(content_types.name, serialize_xml(root), True)
+    rel_name = related.rels_name
+    rels = _relationship_root(replacements.get(rel_name) or package.parts.get(rel_name))
+    used = {node.get("Id") for node in rels}
+    prefix = f"rIdCarbotek{related.kind.title()}"
+    index = 0
+    # Appendix C: lib/html.js uses the fixed id rIdCarbotekNumbering, with a suffix only on a clash.
+    candidate = prefix if related.kind == "numbering" else f"{prefix}0"
+    while candidate in used:
+        index += 1
+        candidate = f"{prefix}{index}"
+    etree.SubElement(
+        rels,
+        qn("rel:Relationship"),
+        Id=candidate,
+        Type=related.relationship_type,
+        Target=posixpath.relpath(name, posixpath.dirname(package.main_document) or "."),
+    )
+    replacements[rel_name] = TemplatePart(rel_name, serialize_xml(rels), True)
+    return True
 
 
 def _ensure_rels_content_type(package: TemplatePackage, replacements: dict[str, TemplatePart]) -> None:
@@ -376,7 +473,7 @@ def _ensure_rels_content_type(package: TemplatePackage, replacements: dict[str, 
     if content_types is None:
         return
     root = parse_xml(replacements.get(content_types.name, content_types).content)
-    if all(node.get("Extension") != "rels" for node in root):
+    if all(node.get("Extension", "").translate(_ASCII_LOWER) != "rels" for node in root.findall(qn("ct:Default"))):
         etree.SubElement(
             root,
             qn("ct:Default"),
@@ -400,8 +497,11 @@ class HtmlSubstitution:
         context = MarkerContext(data=dict(data) if is_mapping(data) else {}, complement=dict(options.complement))
         new_relationships = False
         for part in package.parts.values():
-            if not part.is_xml or not part.name.startswith(
-                ("word/document", "word/header", "word/footer", "word/footnotes", "word/endnotes")
+            if not part.is_xml or not (
+                part.name == package.main_document
+                or part.name.startswith(
+                    ("word/document", "word/header", "word/footer", "word/footnotes", "word/endnotes")
+                )
             ):
                 continue
             if not part.contains(":html", attributes=False):
@@ -413,23 +513,16 @@ class HtmlSubstitution:
             if links.changed:
                 replacements[links.part_name] = links.part()
                 new_relationships = True
-        if new_relationships := _write_numbering(package, replacements, numbering) or new_relationships:
-            content_types = package.parts.get("[Content_Types].xml")
-            if content_types is not None:
-                types_root = parse_xml(replacements.get(content_types.name, content_types).content)
-                if all(node.get("Extension") != "rels" for node in types_root):
-                    etree.SubElement(
-                        types_root,
-                        qn("ct:Default"),
-                        Extension="rels",
-                        ContentType="application/vnd.openxmlformats-package.relationships+xml",
-                    )
-                    replacements[content_types.name] = TemplatePart(
-                        content_types.name,
-                        serialize_xml(types_root),
-                        True,
-                    )
-        if _write_styles(package, replacements, styles):
+        if numbering.changed:
+            name = numbering.part.name
+            if name in replacements:
+                raise CorruptedTemplateError(f"Conflicting DOCX numbering part: {name}")
+            replacements[name] = TemplatePart(name, serialize_xml(numbering.root), True)
+            new_relationships = _ensure_part_link(numbering.part, replacements) or new_relationships
+        if styles.used:
+            _write_styles(replacements, styles)
+            new_relationships = _ensure_part_link(styles.part, replacements) or new_relationships
+        if new_relationships:
             _ensure_rels_content_type(package, replacements)
         return package.replace_parts(replacements) if replacements else package
 

@@ -1,6 +1,7 @@
 """HTML blocks take their look from the template: generated parts name no font of their own."""
 
 from lxml import etree
+from test_html_relationships import _manifest
 from test_render_session import document, root
 
 from carbotek import Engine
@@ -37,7 +38,14 @@ def _template(*styles: str, normal: str = "Normal", with_styles: bool = True) ->
         + "".join(styles)
         + "</w:styles>"
     )
-    return document(marker, **{"word/styles.xml": styles_xml, "word/_rels/document.xml.rels": _RELS})
+    return document(
+        marker,
+        **{
+            "word/styles.xml": styles_xml,
+            "word/_rels/document.xml.rels": _RELS,
+            "[Content_Types].xml": _manifest(styles="word/styles.xml"),
+        },
+    )
 
 
 def _style_ids(output: bytes) -> list[str]:
