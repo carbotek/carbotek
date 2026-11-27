@@ -53,10 +53,11 @@ class TemplatePart:
     def has_tree(self) -> bool:
         return self._tree is not None
 
-    def tree(self) -> Any:
-        """The owned tree of a tree part (mutations are this render's), else a fresh parse of the bytes."""
+    def tree(self, *, readonly: bool = False) -> Any:
+        """Return the owned tree or a fresh parse. Leave the bytes cached for read-only callers."""
         if self._tree is not None:
-            self._content = None  # the caller may change the tree: serialize again when needed
+            if not readonly:
+                self._content = None
             return self._tree
         from carbotek.ooxml.xml import parse_xml
 

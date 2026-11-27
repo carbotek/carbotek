@@ -23,6 +23,7 @@ from carbotek.features.fetch import ImageSourceConfig
 from carbotek.ooxml.fragments import fragment_scope
 from carbotek.options import RenderOptions
 from carbotek.package import TemplatePackage, TemplatePart
+from carbotek.xlsx.cell_text import validate_cell_text
 from carbotek.xlsx.images import WorkbookImages
 
 from .compile import CompiledTemplate, CompiledTemplateCache, compile_template
@@ -109,9 +110,9 @@ class RenderDocument:
         package = compiled.package
         self.renderer.execute_sets(compiled.sets, session)
         if package.kind == "xlsx":
-            return self.repository.dump(
-                _restore_literals(self._render_workbook(package, data, options, compiled.plans), session)
-            )
+            package = _restore_literals(self._render_workbook(package, data, options, compiled.plans), session)
+            validate_cell_text(package, infer_reference=compiled.xlsx_preserves_cell_positions)
+            return self.repository.dump(package)
         # Main phase: loops, fields and directives; feature markers are frozen to item paths.
         for part in package.parts.values():
             if part.is_xml and self.renderer.is_templated(part.name):

@@ -262,6 +262,8 @@ Deliberate, documented differences from the JavaScript engine:
 - When workbook preparation removes `xl/sharedStrings.xml` or `xl/calcChain.xml`, their `Override`
   entries in `[Content_Types].xml` go too (Carbone keeps them, and strict readers such as openpyxl
   fail on the missing part).
+- A rendered XLSX text cell exceeding Excel's limit of 32,767 UTF-16 code units raises
+  `TemplateError`. Carbone writes the workbook even when Excel cannot open it.
 - Items without a named sort key keep their input order.
 - Each picture keeps its own frame size when several pictures use the same image marker (Carbone
   applies the size of the last of them to all).

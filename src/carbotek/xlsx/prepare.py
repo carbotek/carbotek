@@ -18,7 +18,7 @@ compiled template.
 """
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import cmp_to_key
 
@@ -31,6 +31,12 @@ from carbotek.package import TemplatePackage, TemplatePart
 # lib/params.js: preReleaseFeatureIn of a production engine (5004002 only under a test runner).
 DEFAULT_PRE_RELEASE = 5000000
 _XLSX_PREPROCESS_FROM = 4022008
+
+
+def pads_cell_references(options: Mapping[str, object]) -> bool:
+    """Whether preparation preserves gaps when dropping row and cell references."""
+    pre_release = options.get("pre_release_feature_in", DEFAULT_PRE_RELEASE)
+    return isinstance(pre_release, int) and pre_release >= _XLSX_PREPROCESS_FROM
 
 
 def prepare_workbook(
@@ -52,12 +58,12 @@ def prepare_workbook(
     if removed:
         _remove_workbook_parts(texts, removed)
     as_text = options.get("export_formatted_values_as_text", export_formatted_values_as_text) is True
-    pre_release = options.get("pre_release_feature_in", DEFAULT_PRE_RELEASE)
+    pad_references = pads_cell_references(options)
     for name in texts:
         if not name.endswith(".xml") or "sheet" not in name:
             continue
         inline = convert_to_inline_string(texts[name], shared, export_as_text=as_text)
-        if isinstance(pre_release, int) and pre_release >= _XLSX_PREPROCESS_FROM:
+        if pad_references:
             texts[name] = fill_references(inline)
         else:
             texts[name] = remove_row_counter(inline)

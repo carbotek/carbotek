@@ -11,7 +11,7 @@ a cached package is shared between renders without copying.
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from concurrent.futures import Future
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from threading import RLock
 from types import MappingProxyType
 from typing import Any
@@ -29,6 +29,7 @@ from carbotek.markers import VariableDeclaration, parse_declaration, scan
 from carbotek.ooxml.xml import parse_xml, serialize_xml
 from carbotek.package import TemplatePackage, TemplatePart
 from carbotek.xlsx import prepare_workbook
+from carbotek.xlsx.prepare import pads_cell_references
 
 from .ports import DocumentPartRenderer
 
@@ -47,6 +48,7 @@ class CompiledTemplate:
     sets: tuple[SetStatement, ...] = ()
     charts: Mapping[str, ChartTemplate] = field(default_factory=dict[str, ChartTemplate])
     variables: Mapping[str, VariableDeclaration] = field(default_factory=dict[str, VariableDeclaration])
+    xlsx_preserves_cell_positions: bool = True
 
     @property
     def size(self) -> int:
@@ -78,7 +80,8 @@ def compile_template(
     if package.kind == "xlsx":
         package, declared = prepare_workbook(package, export_formatted_values_as_text=export_formatted_values_as_text)
         options = {key: value for key, value in declared.items() if key in _RENDER_OPTION_NAMES}
-        return _analyze_template(package, renderer, options, {}, variable_str)
+        compiled = _analyze_template(package, renderer, options, {}, variable_str)
+        return replace(compiled, xlsx_preserves_cell_positions=pads_cell_references(declared))
     package = _normalize_template_parts(package, renderer)
     package, option_values = extract_template_option_values(package)
     package = HyperlinkSubstitution().prepare(package)

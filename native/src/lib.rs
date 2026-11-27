@@ -552,6 +552,13 @@ fn convert_pdf<'py>(py: Python<'py>, docx: &[u8], image_dpi: f32) -> PyResult<Bo
     Ok(PyBytes::new(py, &pdf))
 }
 
+mod worksheet;
+
+#[pyfunction]
+fn inline_text_fits(content: &[u8], limit: usize) -> bool {
+    worksheet::inline_text_fits(content, limit)
+}
+
 #[pymodule(gil_used = false)]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("API_VERSION", 3)?;
@@ -560,6 +567,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(digit_currency_cents, module)?)?;
     module.add_function(wrap_pyfunction!(join_utf8, module)?)?;
     module.add_function(wrap_pyfunction!(decode_data_uri, module)?)?;
+    module.add_function(wrap_pyfunction!(inline_text_fits, module)?)?;
     #[cfg(feature = "pdf")]
     module.add_function(wrap_pyfunction!(convert_pdf, module)?)?;
     let operations = PyDict::new(module.py());

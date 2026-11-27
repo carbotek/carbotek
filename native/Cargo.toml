@@ -17,6 +17,7 @@ crate-type = ["cdylib"]
 # can still link against libpython.
 pyo3 = "0.29"
 base64 = "0.23"
+memchr = "2"
 # Shortest round-trip digits with ties to even, as JS and Python repr print them.
 ryu = "1"
 # Patched copy of dxpdf 0.8.1 (DOCX to PDF), see vendor/dxpdf/CARBOTEK.md. The python feature of

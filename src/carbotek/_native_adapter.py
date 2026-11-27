@@ -38,6 +38,7 @@ class _Native(Protocol):
     def digit_currency_cents(self, value: Any) -> str | None: ...
     def join_utf8(self, parts: list[str | bytes]) -> bytes: ...
     def decode_data_uri(self, value: Any) -> bytes | None: ...
+    def inline_text_fits(self, content: bytes, limit: int) -> bool: ...
     def convert_pdf(self, docx: bytes, image_dpi: float) -> bytes: ...
 
 
@@ -102,6 +103,13 @@ def native_utf8_joiner() -> Callable[[list[str | bytes]], bytes] | None:
 def native_decode_data_uri(value: Any) -> bytes | None:
     native = _native
     return native.decode_data_uri(value) if native is not None else None
+
+
+def native_inline_text_fits(content: bytes, limit: int) -> bool | None:
+    native = _native
+    if native is None or not hasattr(native, "inline_text_fits"):
+        return None
+    return native.inline_text_fits(content, limit)
 
 
 def native_pdf_available() -> bool:
